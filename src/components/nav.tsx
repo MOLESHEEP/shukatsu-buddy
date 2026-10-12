@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardCheck, House, LogOut, Mail, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
+import { Bell, ClipboardCheck, House, LogOut, Mail, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -14,7 +14,7 @@ const items = [
   { href: "/community", label: "经验", icon: Users },
 ];
 
-type Counts = { replies: number; pending: number };
+type Counts = { replies: number; pending: number; notices: number };
 
 function Dot({ n }: { n: number }) {
   if (!n) return null;
@@ -44,6 +44,7 @@ export function SideNav({ name, provider, isAdmin, counts }: { name: string; pro
         {[
           ...items,
           ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, badge: counts.pending }] : []),
+          { href: "/notifications", label: "通知", icon: Bell, badge: counts.notices },
           { href: "/feedback", label: "意见反馈", icon: MessageSquareHeart, badge: counts.replies },
           { href: "/settings", label: "设置", icon: Settings },
         ].map((it: { href: string; label: string; icon: typeof House; badge?: number }) => {
@@ -118,6 +119,10 @@ export function MobileTopBar({ isAdmin, counts }: { isAdmin: boolean; counts: Co
             {counts.pending > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
           </Link>
         )}
+        <Link href="/notifications" className="relative rounded-full p-2 text-muted hover:bg-paper" aria-label="通知">
+          <Bell className="size-5" />
+          {counts.notices > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
+        </Link>
         <Link href={feedbackHref(path)} className="relative rounded-full p-2 text-muted hover:bg-paper" aria-label="意见反馈">
           <MessageSquareHeart className="size-5" />
           {counts.replies > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}

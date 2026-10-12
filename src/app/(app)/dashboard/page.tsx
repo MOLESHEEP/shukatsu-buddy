@@ -3,6 +3,8 @@ import { ArrowRight, Building2, Mail, PenLine, Sparkles, Users } from "lucide-re
 import { requireUser } from "@/lib/auth";
 import { stats, upcoming } from "@/lib/data";
 import { aiAccess } from "@/lib/ai-access";
+import { unreadImportant } from "@/lib/notifications";
+import { ImportantNotices } from "@/components/important-notices";
 import { Card, EmptyState } from "@/components/ui";
 import { UpcomingList } from "@/components/upcoming-list";
 
@@ -22,7 +24,7 @@ function greeting() {
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const [items, s, ai] = await Promise.all([upcoming(user.id, 0, 14), stats(user.id), aiAccess(user)]);
+  const [items, s, ai, notices] = await Promise.all([upcoming(user.id, 0, 14), stats(user.id), aiAccess(user), unreadImportant(user.id)]);
   const urgent = items.filter((i) => new Date(i.at).getTime() - Date.now() < 3 * 86400000).length;
 
   return (
@@ -41,6 +43,8 @@ export default async function Dashboard() {
           )}
         </p>
       </div>
+
+      <ImportantNotices notices={notices} />
 
       {ai.demo && user.role === "admin" && (
         <Link href="/admin/ai" className="flex items-start gap-3 rounded-2xl bg-violet-50 px-4 py-3 text-sm text-violet-700 hover:bg-violet-100">

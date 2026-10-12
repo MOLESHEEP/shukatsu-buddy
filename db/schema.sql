@@ -199,6 +199,44 @@ CREATE TABLE IF NOT EXISTS feedback (
 CREATE INDEX IF NOT EXISTS feedback_status_idx ON feedback(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS feedback_user_idx ON feedback(user_id, created_at DESC);
 
+-- ---------- v0.7: 注册限制 / 邀请码 ----------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_ip_hash TEXT;     -- sha256(AUTH_SECRET + IP), never the raw IP
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code    TEXT;
+CREATE INDEX IF NOT EXISTS users_signup_ip_idx ON users(signup_ip_hash, created_at);
+
+CREATE TABLE IF NOT EXISTS invite_codes (
+  code            TEXT PRIMARY KEY,
+  note            TEXT NOT NULL DEFAULT '',
+  max_uses        INT,                                  -- NULL = unlimited
+  uses            INT NOT NULL DEFAULT 0,
+  expires_at      TIMESTAMPTZ,
+  disabled        BOOLEAN NOT NULL DEFAULT false,
+  created_by      BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ---------- v0.7: 全站通知 ----------
+CREATE TABLE IF NOT EXISTS announcements (
+  id              BIGSERIAL PRIMARY KEY,
+  title           TEXT NOT NULL,
+  body            TEXT NOT NULL DEFAULT '',
+  link            TEXT NOT NULL DEFAULT '',
+  level           TEXT NOT NULL DEFAULT 'info',         -- info | important
+  audience        TEXT NOT NULL DEFAULT 'all',          -- all | ids
+  user_ids        BIGINT[] NOT NULL DEFAULT '{}',
+  created_by      BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  withdrawn       BOOLEAN NOT NULL DEFAULT false
+);
+CREATE INDEX IF NOT EXISTS announcements_time_idx ON announcements(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS announcement_reads (
+  announcement_id BIGINT NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  read_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (announcement_id, user_id)
+);
+
 -- Posts: status may also be 'hidden' (by an admin).
 CREATE TABLE IF NOT EXISTS post_reports (
   id              BIGSERIAL PRIMARY KEY,
