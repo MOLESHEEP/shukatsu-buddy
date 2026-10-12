@@ -1,5 +1,7 @@
 # One-command deploy:   cp .env.example .env  &&  docker compose up -d
-# With automatic HTTPS: docker compose --profile https up -d   (set DOMAIN in .env)
+# Cloudflare Tunnel (recommended, free HTTPS, no open ports): docker compose --profile tunnel up -d   (set TUNNEL_TOKEN)
+# Caddy + Let's Encrypt (opens 80/443):                       docker compose --profile https up -d    (set DOMAIN)
+# Server without building: set APP_IMAGE=ghcr.io/molesheep/shukatsu-buddy:latest, then `pull` and `up -d --no-build`.
 
 services:
   db:
@@ -25,13 +27,26 @@ services:
     environment:
       DATABASE_URL: postgres://shukatsu:${POSTGRES_PASSWORD}@db:5432/shukatsu
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # APP_BIND=127.0.0.1 keeps the app off the public internet (use with Cloudflare Tunnel or a local reverse proxy).
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
     # Lets OLLAMA_BASE_URL / CUSTOM_BASE_URL reach services on the host via host.docker.internal (Linux too).
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
+
+  # Optional: Cloudflare Tunnel. Outbound-only connection to Cloudflare; HTTPS, CDN and DDoS protection for free.
+  # In the Cloudflare dashboard, point the tunnel's public hostname to http://app:3000.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.3.0
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - app
 
   # Optional reverse proxy with automatic Let's Encrypt certificates.
   caddy:

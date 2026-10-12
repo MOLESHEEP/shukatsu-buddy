@@ -94,7 +94,22 @@ docker compose down -v            # 停止并删除所有数据（慎用）
 
 ## 部署到你的网站
 
-### 方式一：服务器上直接构建（最简单）
+### 推荐：Cloudflare Tunnel + 一键脚本（最省钱）
+
+适合域名托管在 Cloudflare 的情况。服务器不需要公网端口和证书，Cloudflare 免费提供 HTTPS、CDN 和 DDoS 防护，还能隐藏服务器 IP。服务器直接拉取 GitHub 自动构建好的镜像（支持 x86 和 ARM），**1 GB 内存的最便宜 VPS 就够用**。
+
+1. **创建隧道**：Cloudflare 面板 → Zero Trust → Networks → Tunnels → Create a tunnel（类型选 Cloudflared），起个名字，复制安装命令里 `--token` 后面那一长串（这就是 `TUNNEL_TOKEN`）。
+2. **添加公网域名**：在这个隧道的 Public Hostname 里添加一条：子域名如 `shukatsu`、选择你的域名，Service 填 `HTTP` + `app:3000`。Cloudflare 会自动创建 DNS 记录。
+3. **在服务器上运行一键脚本**（Ubuntu / Debian）：
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/MOLESHEEP/shukatsu-buddy/main/deploy/install.sh | sudo bash
+   ```
+   脚本会安装 Docker、在小内存机器上加 2 GB swap、生成随机密钥，并询问域名、管理员邮箱 / 密码和 `TUNNEL_TOKEN`，然后启动全部服务。
+4. 打开 `https://你的子域名`，用管理员账号登录，在「管理后台 → AI 与额度」填 API Key 即可。
+
+更新到最新版：`cd /opt/shukatsu-buddy && git pull && docker compose --profile tunnel pull && docker compose --profile tunnel up -d --no-build`
+
+### 方式一：服务器上直接构建
 
 在任意 Linux VPS（1 vCPU / 1 GB 内存即可）上执行上面的「快速开始」，然后：
 
