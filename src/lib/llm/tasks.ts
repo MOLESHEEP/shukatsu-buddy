@@ -3,10 +3,12 @@ import { generate } from "./provider";
 import {
   EmailParseSchema,
   EsReviewSchema,
+  ImportExtractSchema,
   PostDraftSchema,
   ReplySchema,
   type EmailParse,
   type EsReview,
+  type ImportExtract,
   type PostDraft,
   type ReplyDraft,
 } from "./schemas";
@@ -174,6 +176,62 @@ export async function draftPost(input: {
     mock: () => mockPost(input.kind, input.company, input.notes),
     ctx: { userId, task: "post" },
   });
+}
+
+// ---------------- 管理员批量导入 ----------------
+
+const IMPORT_SYSTEM = `你帮管理员把一大段收集来的原始材料（访谈记录、问卷回答、聊天记录等）拆分并整理成多篇独立的经验分享，供在日本求职、工作的中国人参考。
+规则：
+- 每段独立的经历（一个人在一家公司的一次面试经历，或一段工作经历）整理成一篇；同一人同一公司的多轮面试合成一篇。
+- 只使用原文中的事实，绝不补充、推测或美化。原文没有的字段留空（字符串填 ""，数字填 null）。
+- 时间必须来自原文：明确到年月时填 YYYY-MM；只有年份或完全没提到时 occurred_on 填 ""，交给管理员补充。
+- kind：面试、笔试、说明会等选考经历为 interview；入职后的工作感受为 work。
+- 正文 sections 按主题分小节（面试：选考流程 / 面试形式与氛围 / 被问到的问题 / 结果与感想 / 建议；工作：工作内容 / 团队与氛围 / 加班 / 对外国人的友好度 / 成长 / 建议），保留第一人称和原作者观点，用简体中文；面试问题等日文原文保留。
+- 去掉或模糊化可识别个人的信息（面试官、同事、受访者的姓名和联系方式）。
+- title 一句话概括，30 字以内。tags 3–5 个。
+- 无法整理的片段（太短、不是经验、无法判断公司）写进 skipped_zh，不要硬凑。`;
+
+export async function extractImportPosts(text: string, userId: number): Promise<ImportExtract> {
+  return generate({
+    system: IMPORT_SYSTEM,
+    prompt: `今天是 ${todayLocal()}。\n\n【原始材料】\n${text}`,
+    schema: ImportExtractSchema,
+    effort: "medium",
+    mock: () => mockImport(text),
+    ctx: { userId, task: "import" },
+  });
+}
+
+function mockImport(text: string): ImportExtract {
+  const chunks = text
+    .split(/\n\s*\n|^-{3,}$/m)
+    .map((c) => c.trim())
+    .filter((c) => c.length >= 15)
+    .slice(0, 10);
+  return {
+    posts: chunks.map((c) => {
+      const company = c.match(/(株式会社[^\s　、。，,\n]{1,20}|[^\s　、。，,\n]{1,20}(株式会社|銀行|商事|製薬))/)?.[0] ?? "";
+      const ym = c.match(/(\d{4})\s*[年/.-]\s*(\d{1,2})\s*月?/);
+      const work = /入职|在职|工作|上班|加班|同事/.test(c) && !/面试|面接/.test(c);
+      return {
+        kind: work ? "work" : "interview",
+        company_name: company,
+        industry: "",
+        role: "",
+        occurred_on: ym ? `${ym[1]}-${ym[2].padStart(2, "0")}` : "",
+        ended_on: null,
+        grad_year: null,
+        stage: "",
+        result: /通过|内定/.test(c) ? "passed" : "unknown",
+        employment_type: "",
+        rating: null,
+        title: `【演示】${company || "某公司"}${work ? "工作体验" : "面试经验"}`,
+        sections: [{ heading: work ? "工作体验" : "面试经历", content: c }],
+        tags: ["演示模式"],
+      };
+    }),
+    skipped_zh: ["【演示模式】按空行粗略拆分；配置 AI 后会真实理解并整理内容"],
+  };
 }
 
 // ---------------- Demo-mode samples ----------------

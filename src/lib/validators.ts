@@ -8,13 +8,13 @@ export const TestBody = z.object({
   confidence: z.number().nullable().optional(),
 });
 
-const month = z.string().regex(/^\d{4}-\d{2}$/, "月份格式应为 YYYY-MM");
+const month = z.string("时间必填").regex(/^\d{4}-\d{2}$/, "时间应为 YYYY-MM（如 2027-03）");
 
 /** Metadata + content of a community post. Time labels are required. */
 export const PostInput = z
   .object({
-    kind: z.enum(["interview", "work"]),
-    company_name: z.string().trim().min(1).max(100),
+    kind: z.enum(["interview", "work"], "类型应为 面试 / 工作"),
+    company_name: z.string().trim().min(1, "公司必填").max(100),
     industry: z.string().trim().max(60).default(""),
     role: z.string().trim().max(60).default(""),
     occurred_on: month,
@@ -24,11 +24,13 @@ export const PostInput = z
     result: z.enum(["passed", "failed", "pending", "unknown"]).default("unknown"),
     employment_type: z.string().max(40).default(""),
     rating: z.number().int().min(1).max(5).nullable().optional(),
-    title: z.string().trim().min(1).max(80),
+    title: z.string().trim().min(1, "标题必填").max(80, "标题最多 80 字"),
     body: z.string().trim().min(20, "正文至少 20 字").max(8000),
     tags: z.array(z.string().trim().min(1).max(20)).max(8).default([]),
     anonymous: z.boolean().default(true),
     notes: z.string().max(6000).default(""),
+    /** Admin bulk import only: where the content came from. */
+    source: z.string().trim().max(200).default(""),
   })
   .refine((p) => !p.ended_on || p.ended_on >= p.occurred_on, { message: "结束时间不能早于开始时间", path: ["ended_on"] });
 

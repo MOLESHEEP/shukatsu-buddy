@@ -44,6 +44,8 @@ export type Post = {
   body: string;
   tags: string[];
   anonymous: boolean;
+  /** Set for admin-imported posts. */
+  source: string;
   created_at: string;
   updated_at: string;
   published_at: string | null;

@@ -10,7 +10,7 @@ import { currentChain, resolveProvider, type ResolvedProvider } from "./provider
 export type Effort = "low" | "medium" | "high";
 
 /** Task names logged to ai_usage; daily limits count successful rows per task group. */
-export type AiTask = "es" | "es_retry" | "email" | "reply" | "post" | "test";
+export type AiTask = "es" | "es_retry" | "email" | "reply" | "post" | "import" | "test";
 
 export type CallContext = { userId: number | null; task: AiTask };
 

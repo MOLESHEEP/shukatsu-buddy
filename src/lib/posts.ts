@@ -6,7 +6,7 @@ import type { Post } from "./community";
 const COLUMNS = `
   p.id, p.user_id, p.kind, p.status, p.company_name, p.industry, p.role,
   to_char(p.occurred_on, 'YYYY-MM') AS occurred_on, to_char(p.ended_on, 'YYYY-MM') AS ended_on,
-  p.grad_year, p.stage, p.result, p.employment_type, p.rating, p.title, p.body, p.tags, p.anonymous,
+  p.grad_year, p.stage, p.result, p.employment_type, p.rating, p.title, p.body, p.tags, p.anonymous, p.source,
   p.created_at, p.updated_at, p.published_at,
   CASE WHEN p.anonymous THEN '' ELSE u.display_name END AS author,
   (SELECT count(*) FROM post_votes v WHERE v.post_id = p.id)::int AS votes,

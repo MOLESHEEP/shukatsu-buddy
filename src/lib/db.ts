@@ -73,6 +73,23 @@ export async function query<T extends QueryResultRow = QueryResultRow>(text: str
   return res.rows;
 }
 
+/** Runs fn inside BEGIN/COMMIT on one connection; rolls back on error. */
+export async function transaction<T>(fn: (q: <R extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]) => Promise<R[]>) => Promise<T>): Promise<T> {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const out = await fn(async (text, params = []) => (await client.query(text, params)).rows);
+    await client.query("COMMIT");
+    return out;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function queryOne<T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) {
   const rows = await query<T>(text, params);
   return rows[0] ?? null;

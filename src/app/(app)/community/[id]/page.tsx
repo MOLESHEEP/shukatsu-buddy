@@ -63,7 +63,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         )}
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-xs text-muted">
           <span>
-            {authorLabel(post)} · {post.published_at ? `发布于 ${new Date(post.published_at).toLocaleDateString("zh-CN")}` : "未发布"}
+            {post.source ? `来源：${post.source}` : authorLabel(post)} · {post.published_at ? `发布于 ${new Date(post.published_at).toLocaleDateString("zh-CN")}` : "未发布"}
             {post.published_at && post.updated_at > post.published_at && new Date(post.updated_at).getTime() - new Date(post.published_at).getTime() > 60000
               ? ` · 更新于 ${new Date(post.updated_at).toLocaleDateString("zh-CN")}`
               : ""}

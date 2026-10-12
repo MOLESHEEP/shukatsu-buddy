@@ -168,6 +168,20 @@ CREATE TABLE IF NOT EXISTS post_votes (
   PRIMARY KEY (post_id, user_id)
 );
 
+-- ---------- v0.5: 批量导入 ----------
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS source       TEXT NOT NULL DEFAULT '';   -- where imported content came from, shown on the post
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS import_batch TEXT;                       -- admin bulk-import batch id (for undo)
+CREATE INDEX IF NOT EXISTS posts_import_batch_idx ON posts(import_batch) WHERE import_batch IS NOT NULL;
+CREATE TABLE IF NOT EXISTS import_batches (
+  id              TEXT PRIMARY KEY,
+  admin_id        BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  label           TEXT NOT NULL DEFAULT '',
+  method          TEXT NOT NULL DEFAULT 'table',        -- table | ai
+  count           INT NOT NULL DEFAULT 0,
+  published       BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Posts: status may also be 'hidden' (by an admin).
 CREATE TABLE IF NOT EXISTS post_reports (
   id              BIGSERIAL PRIMARY KEY,

@@ -70,6 +70,29 @@ export const PostDraftSchema = z.object({
 });
 export type PostDraft = z.infer<typeof PostDraftSchema>;
 
+export const ImportExtractSchema = z.object({
+  posts: z.array(
+    z.object({
+      kind: z.enum(["interview", "work"]),
+      company_name: z.string(),
+      industry: z.string(),
+      role: z.string(),
+      occurred_on: z.string().describe("YYYY-MM；原文没有明确到月份时填空字符串"),
+      ended_on: z.string().nullable().describe("工作体验的离职月份 YYYY-MM；仍在职或未提及填 null"),
+      grad_year: z.number().int().nullable().describe("面试时作者的毕业年份，如 2028；未提及填 null"),
+      stage: z.string(),
+      result: z.enum(["passed", "failed", "pending", "unknown"]),
+      employment_type: z.string(),
+      rating: z.number().int().nullable().describe("1–5，原文有明确评价时才填"),
+      title: z.string(),
+      sections: z.array(z.object({ heading: z.string(), content: z.string() })),
+      tags: z.array(z.string()),
+    }),
+  ),
+  skipped_zh: z.array(z.string()).describe("无法整理成经验分享的片段及原因"),
+});
+export type ImportExtract = z.infer<typeof ImportExtractSchema>;
+
 export const ReplySchema = z.object({
   subject: z.string(),
   body: z.string(),
