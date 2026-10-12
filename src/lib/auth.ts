@@ -2,7 +2,7 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
-import { query, queryOne } from "./db";
+import { query, queryOne, superAdminEmails } from "./db";
 
 export const SESSION_COOKIE = "sb_session";
 const SESSION_DAYS = 30;
@@ -69,6 +69,8 @@ export type User = {
   /** NULL = follow the site-wide default set by the admin. */
   ai_enabled: boolean | null;
   session_version: number;
+  /** Derived from SUPER_ADMIN_EMAILS, never stored: can grant / revoke admin rights. */
+  is_super: boolean;
 };
 
 /** The signed-in user. Banned accounts are treated as signed out. */
@@ -83,6 +85,7 @@ export async function getUser(): Promise<User | null> {
     [uid],
   );
   if (!user || user.status !== "active" || user.session_version !== session.sv) return null;
+  user.is_super = user.role === "admin" && superAdminEmails().includes(user.email.toLowerCase());
   // Cheap activity tracking for the admin overview (at most one write per 10 minutes).
   void query(`UPDATE users SET last_seen_at = now() WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '10 minutes')`, [
     uid,

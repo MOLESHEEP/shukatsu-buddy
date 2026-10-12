@@ -24,9 +24,9 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
       </form>
       <p className="text-xs text-muted">
         新用户 AI 默认：<b>{settings.aiDefaultEnabled ? "开启" : "关闭"}</b> · 每日默认额度：ES {limits.es} 次 / 邮件助手 {limits.email} 次 / 经验整理 {limits.post} 次（可在「AI 与额度」修改）。
-        管理员不受 AI 开关和额度限制。
+        管理员不受 AI 开关和额度限制。{me.is_super ? " 你是超级管理员：展开用户可以「设为管理员 / 取消管理员」。" : ""}
       </p>
-      <UsersTable users={users} meId={me.id} defaults={{ ai: settings.aiDefaultEnabled, ...limits }} />
+      <UsersTable users={users} meId={me.id} defaults={{ ai: settings.aiDefaultEnabled, ...limits }} viewerSuper={me.is_super} />
     </div>
   );
 }

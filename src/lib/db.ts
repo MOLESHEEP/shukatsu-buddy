@@ -23,11 +23,24 @@ async function applySchema() {
   await seedAdmins();
 }
 
-export function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS ?? process.env.ADMIN_EMAIL ?? "")
+const emailList = (v: string | undefined) =>
+  (v ?? "")
     .split(/[,\s]+/)
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+
+/** Admins defined in the server environment (always admin; can't be demoted from the web). */
+export function adminEmails(): string[] {
+  return emailList(process.env.ADMIN_EMAILS ?? process.env.ADMIN_EMAIL);
+}
+
+/**
+ * Super admins may grant and revoke admin rights. Defined only in the environment;
+ * defaults to ADMIN_EMAILS so existing deployments keep working.
+ */
+export function superAdminEmails(): string[] {
+  const s = emailList(process.env.SUPER_ADMIN_EMAILS);
+  return s.length ? s : adminEmails();
 }
 
 /**
@@ -36,7 +49,8 @@ export function adminEmails(): string[] {
  * An existing admin's password is never overwritten, so it can be changed in Settings.
  */
 async function seedAdmins() {
-  const emails = adminEmails();
+  // Super admins are admins too, even if only listed in SUPER_ADMIN_EMAILS.
+  const emails = [...new Set([...adminEmails(), ...emailList(process.env.SUPER_ADMIN_EMAILS)])];
   if (!emails.length) return;
   const pool = getPool();
   const password = process.env.ADMIN_PASSWORD;

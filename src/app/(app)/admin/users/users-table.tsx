@@ -2,25 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Check, ChevronDown, Copy, KeyRound, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
+import { Ban, Check, ChevronDown, Copy, Crown, KeyRound, RotateCcw, ShieldCheck, ShieldMinus, ShieldPlus, Sparkles } from "lucide-react";
 import { Badge, Button, EmptyState, Input, cx } from "@/components/ui";
 import { api, errMsg } from "@/lib/client";
 import type { AdminUserRow } from "@/lib/admin";
 
 type Defaults = { ai: boolean; es: number; email: number; post: number };
 
-export function UsersTable({ users, meId, defaults }: { users: AdminUserRow[]; meId: number; defaults: Defaults }) {
+export function UsersTable({ users, meId, defaults, viewerSuper }: { users: AdminUserRow[]; meId: number; defaults: Defaults; viewerSuper: boolean }) {
   if (!users.length) return <EmptyState title="没有符合条件的用户" />;
   return (
     <div className="space-y-2">
       {users.map((u) => (
-        <UserRow key={u.id} u={u} isMe={u.id === meId} defaults={defaults} />
+        <UserRow key={u.id} u={u} isMe={u.id === meId} defaults={defaults} viewerSuper={viewerSuper} />
       ))}
     </div>
   );
 }
 
-function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaults: Defaults }) {
+function UserRow({ u, isMe, defaults, viewerSuper }: { u: AdminUserRow; isMe: boolean; defaults: Defaults; viewerSuper: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,6 +46,15 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
     } finally {
       setBusy(false);
     }
+  }
+
+  async function setRole(role: "admin" | "user") {
+    const msg =
+      role === "admin"
+        ? `把 ${u.email} 设为管理员？对方将可以管理用户、内容、通知和 AI 设置（但不能授予或取消他人的管理员权限）。`
+        : `取消 ${u.email} 的管理员权限？对方会立即变回普通用户。`;
+    if (!confirm(msg)) return;
+    await patch({ role });
   }
 
   async function makeResetLink() {
@@ -75,7 +84,14 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate font-medium">{u.display_name || "（未填名字）"}</span>
-            {admin && <Badge tone="violet">管理员</Badge>}
+            {u.is_super ? (
+              <Badge tone="lemon">
+                <Crown className="size-3" /> 超级管理员
+              </Badge>
+            ) : (
+              admin && <Badge tone="violet">管理员</Badge>
+            )}
+            {isMe && <Badge tone="sky">我</Badge>}
             {u.status === "banned" && <Badge tone="rose">已停用</Badge>}
             {u.career_stage === "working" && <Badge tone="mint">在职</Badge>}
             {u.grad_year && <span className="text-xs text-muted">{String(u.grad_year).slice(-2)}届</span>}
@@ -83,6 +99,7 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
           <div className="truncate text-xs text-muted">
             {u.email} · 注册 {new Date(u.created_at).toLocaleDateString("zh-CN")}
             {u.last_seen_at && ` · 最近活跃 ${new Date(u.last_seen_at).toLocaleDateString("zh-CN")}`}
+            {admin && (u.env_admin ? " · 服务器配置的管理员" : u.granted_by_email ? ` · 由 ${u.granted_by_email} 于 ${new Date(u.role_granted_at!).toLocaleDateString("zh-CN")} 授予` : "")}
           </div>
         </div>
 
@@ -163,7 +180,13 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
             >
               保存额度
             </Button>
-            {(!admin || isMe) && u.status === "active" && (
+            {viewerSuper && !isMe && !u.env_admin && u.status === "active" && (
+              <Button size="sm" variant={admin ? "danger" : "soft"} disabled={busy} onClick={() => setRole(admin ? "user" : "admin")}>
+                {admin ? <ShieldMinus className="size-3.5" /> : <ShieldPlus className="size-3.5" />}
+                {admin ? "取消管理员" : "设为管理员"}
+              </Button>
+            )}
+            {(!admin || isMe || (viewerSuper && !u.env_admin)) && u.status === "active" && (
               <Button size="sm" variant="ghost" disabled={busy} onClick={makeResetLink} title="用户忘记密码时使用">
                 <KeyRound className="size-3.5" /> 重置密码链接
               </Button>

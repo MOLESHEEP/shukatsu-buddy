@@ -60,6 +60,7 @@ if [ ! -f .env ]; then
   set_env AUTH_SECRET "$(openssl rand -base64 32 | tr -d '\n/+=')"
   set_env POSTGRES_PASSWORD "$(openssl rand -hex 16)"
   set_env ADMIN_EMAILS "$admin_email"
+  set_env SUPER_ADMIN_EMAILS "$admin_email"
   set_env ADMIN_PASSWORD "$admin_pw"
   set_env PUBLIC_URL "https://$domain"
   set_env DOMAIN "$domain"

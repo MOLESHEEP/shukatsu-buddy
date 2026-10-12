@@ -1,5 +1,5 @@
 import "server-only";
-import { query, queryOne } from "./db";
+import { adminEmails, query, queryOne, superAdminEmails } from "./db";
 import { getLlmSettings, maskSecret, openSecret } from "./settings";
 import { allProviders, providerChain, routing } from "./llm/providers";
 import { getDefaultLimits } from "./quota";
@@ -64,6 +64,11 @@ export type AdminUserRow = {
   today_post: number;
   total_ai: number;
   posts: number;
+  role_granted_at: string | null;
+  granted_by_email: string | null;
+  /** Defined in .env: admin rights can't be changed from the web. */
+  env_admin: boolean;
+  is_super: boolean;
 };
 
 export async function listUsers(q: string, filter: string) {
@@ -85,17 +90,26 @@ export async function listUsers(q: string, filter: string) {
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok AND a.task IN ('email', 'reply') AND a.created_at >= ${since})::int AS today_email,
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok AND a.task = 'post' AND a.created_at >= ${since})::int AS today_post,
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok)::int AS total_ai,
-            (SELECT count(*) FROM posts p WHERE p.user_id = u.id)::int AS posts
+            (SELECT count(*) FROM posts p WHERE p.user_id = u.id)::int AS posts,
+            u.role_granted_at, (SELECT g.email FROM users g WHERE g.id = u.role_granted_by) AS granted_by_email
        FROM users u
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ORDER BY u.id DESC LIMIT 200`,
     params,
   );
-  return rows.map((r) => ({
-    ...(r as AdminUserRow),
-    created_at: (r.created_at as Date).toISOString(),
-    last_seen_at: r.last_seen_at ? (r.last_seen_at as Date).toISOString() : null,
-  }));
+  const envAdmins = adminEmails();
+  const supers = superAdminEmails();
+  return rows.map((r) => {
+    const email = String(r.email).toLowerCase();
+    return {
+      ...(r as AdminUserRow),
+      created_at: (r.created_at as Date).toISOString(),
+      last_seen_at: r.last_seen_at ? (r.last_seen_at as Date).toISOString() : null,
+      role_granted_at: r.role_granted_at ? (r.role_granted_at as Date).toISOString() : null,
+      env_admin: envAdmins.includes(email) || supers.includes(email),
+      is_super: r.role === "admin" && supers.includes(email),
+    };
+  });
 }
 
 export type AdminReportRow = {

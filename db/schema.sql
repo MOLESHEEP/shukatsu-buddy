@@ -259,6 +259,10 @@ CREATE TABLE IF NOT EXISTS auth_throttle (
 );
 CREATE INDEX IF NOT EXISTS auth_throttle_idx ON auth_throttle(kind, key, created_at);
 
+-- ---------- v0.9: 超级管理员授予 / 取消管理员 ----------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role_granted_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role_granted_at TIMESTAMPTZ;
+
 -- Posts: status may also be 'hidden' (by an admin).
 CREATE TABLE IF NOT EXISTS post_reports (
   id              BIGSERIAL PRIMARY KEY,
