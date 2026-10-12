@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardCheck, House, LogOut, Mail, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
+import { ClipboardCheck, House, LogOut, Mail, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -14,7 +14,19 @@ const items = [
   { href: "/community", label: "经验", icon: Users },
 ];
 
-export function SideNav({ name, provider, isAdmin }: { name: string; provider: string | null; isAdmin: boolean }) {
+type Counts = { replies: number; pending: number };
+
+function Dot({ n }: { n: number }) {
+  if (!n) return null;
+  return <span className="ml-auto min-w-5 rounded-full bg-sakura-500 px-1.5 text-center text-[11px] font-semibold leading-5 text-white tabular-nums">{n > 99 ? "99+" : n}</span>;
+}
+
+/** Feedback link carries the current page so admins know where the user was. */
+function feedbackHref(path: string) {
+  return path.startsWith("/feedback") ? "/feedback" : `/feedback?from=${encodeURIComponent(path)}`;
+}
+
+export function SideNav({ name, provider, isAdmin, counts }: { name: string; provider: string | null; isAdmin: boolean; counts: Counts }) {
   const path = usePathname();
   const router = useRouter();
   async function logout() {
@@ -29,12 +41,17 @@ export function SideNav({ name, provider, isAdmin }: { name: string; provider: s
         就活小助手
       </Link>
       <nav className="mt-8 space-y-1">
-        {[...items, ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck }] : []), { href: "/settings", label: "设置", icon: Settings }].map((it) => {
+        {[
+          ...items,
+          ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, badge: counts.pending }] : []),
+          { href: "/feedback", label: "意见反馈", icon: MessageSquareHeart, badge: counts.replies },
+          { href: "/settings", label: "设置", icon: Settings },
+        ].map((it: { href: string; label: string; icon: typeof House; badge?: number }) => {
           const active = path.startsWith(it.href);
           return (
             <Link
               key={it.href}
-              href={it.href}
+              href={it.href === "/feedback" ? feedbackHref(path) : it.href}
               className={cx(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
                 active ? "bg-sakura-50 text-sakura-700" : "text-muted hover:bg-stone-50 hover:text-ink",
@@ -42,6 +59,7 @@ export function SideNav({ name, provider, isAdmin }: { name: string; provider: s
             >
               <it.icon className="size-[18px]" />
               {({ 选考: "选考追踪", 邮件: "邮件助手", 经验: "经验分享" } as Record<string, string>)[it.label] ?? it.label}
+              <Dot n={it.badge ?? 0} />
             </Link>
           );
         })}
@@ -85,7 +103,8 @@ export function BottomNav() {
   );
 }
 
-export function MobileTopBar({ isAdmin }: { isAdmin: boolean }) {
+export function MobileTopBar({ isAdmin, counts }: { isAdmin: boolean; counts: Counts }) {
+  const path = usePathname();
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-cream/85 px-4 py-3 backdrop-blur md:hidden">
       <Link href="/dashboard" className="flex items-center gap-2 font-bold">
@@ -94,10 +113,15 @@ export function MobileTopBar({ isAdmin }: { isAdmin: boolean }) {
       </Link>
       <div className="flex">
         {isAdmin && (
-          <Link href="/admin" className="rounded-full p-2 text-violet-600 hover:bg-paper" aria-label="管理后台">
+          <Link href="/admin" className="relative rounded-full p-2 text-violet-600 hover:bg-paper" aria-label="管理后台">
             <ShieldCheck className="size-5" />
+            {counts.pending > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
           </Link>
         )}
+        <Link href={feedbackHref(path)} className="relative rounded-full p-2 text-muted hover:bg-paper" aria-label="意见反馈">
+          <MessageSquareHeart className="size-5" />
+          {counts.replies > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
+        </Link>
         <Link href="/settings" className="rounded-full p-2 text-muted hover:bg-paper" aria-label="设置">
           <Settings className="size-5" />
         </Link>

@@ -20,6 +20,8 @@ export async function overview() {
         (SELECT count(*) FROM posts WHERE status = 'published')::int AS posts_published,
         (SELECT count(*) FROM posts WHERE status = 'hidden')::int AS posts_hidden,
         (SELECT count(*) FROM post_reports WHERE status = 'open')::int AS reports_open,
+        (SELECT count(*) FROM feedback WHERE status = 'new')::int AS feedback_new,
+        (SELECT count(*) FROM feedback WHERE status IN ('doing', 'accepted'))::int AS feedback_open,
         (SELECT count(*) FROM companies)::int AS companies,
         (SELECT count(*) FROM es_docs)::int AS es_docs`),
     queryOne<{ calls: number; ok: number; today: number }>(`

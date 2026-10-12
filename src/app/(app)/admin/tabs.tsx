@@ -7,6 +7,7 @@ import { cx } from "@/components/ui";
 const tabs = [
   { href: "/admin", label: "📊 概览" },
   { href: "/admin/users", label: "👥 用户" },
+  { href: "/admin/feedback", label: "💡 反馈" },
   { href: "/admin/reports", label: "🚩 举报" },
   { href: "/admin/import", label: "📥 批量导入" },
   { href: "/admin/ai", label: "🤖 AI 与额度" },

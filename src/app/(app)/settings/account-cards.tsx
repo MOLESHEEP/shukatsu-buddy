@@ -61,9 +61,13 @@ export function AiStatusCard({ userId, isAdmin, ai, quota }: { userId: number; i
         </div>
       )}
       {ai.demo && <p className="text-xs text-violet-700">当前站点处于演示模式，AI 返回示例结果。</p>}
-      {isAdmin && (
+      {isAdmin ? (
         <Link href="/admin/ai" className="inline-block text-sm font-medium text-sakura-600 hover:underline">
           管理 AI 服务、模型和额度 →
+        </Link>
+      ) : (
+        <Link href="/feedback?from=/settings" className="inline-block text-xs text-muted hover:text-sakura-600">
+          对 AI 功能或次数有建议？去「意见反馈」告诉管理员 →
         </Link>
       )}
     </Card>

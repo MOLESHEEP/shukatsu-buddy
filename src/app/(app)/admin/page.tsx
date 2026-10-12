@@ -12,6 +12,7 @@ export default async function AdminOverview() {
   const tiles = [
     { label: "用户总数", value: c.users, sub: `近 7 天新增 ${c.users_new_7d}`, tone: "bg-sky-50 text-sky-700", href: "/admin/users" },
     { label: "7 天活跃", value: c.users_active_7d, sub: `已开通 AI ${c.users_ai_on} · 停用 ${c.users_banned}`, tone: "bg-mint-50 text-mint-700", href: "/admin/users" },
+    { label: "新反馈", value: c.feedback_new, sub: `处理中 / 已采纳 ${c.feedback_open}`, tone: c.feedback_new ? "bg-lemon-50 text-lemon-700" : "bg-stone-50 text-stone-700", href: "/admin/feedback" },
     { label: "待处理举报", value: c.reports_open, sub: `已隐藏帖子 ${c.posts_hidden}`, tone: c.reports_open ? "bg-sakura-50 text-sakura-700" : "bg-stone-50 text-stone-700", href: "/admin/reports" },
     { label: "已发布经验", value: c.posts_published, sub: `公司卡片 ${c.companies} · ES ${c.es_docs}`, tone: "bg-violet-50 text-violet-700", href: "/community" },
   ];
@@ -20,7 +21,7 @@ export default async function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {tiles.map((t) => (
           <Link key={t.label} href={t.href} className={`rounded-[var(--radius-card)] p-5 transition hover:-translate-y-0.5 ${t.tone}`}>
             <div className="text-3xl font-bold tabular-nums">{t.value}</div>

@@ -182,6 +182,23 @@ CREATE TABLE IF NOT EXISTS import_batches (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ---------- v0.6: 意见反馈 ----------
+CREATE TABLE IF NOT EXISTS feedback (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  category        TEXT NOT NULL DEFAULT 'idea',         -- idea | bug | content | other
+  content         TEXT NOT NULL,
+  page            TEXT NOT NULL DEFAULT '',             -- where the user was when they opened the form
+  status          TEXT NOT NULL DEFAULT 'new',          -- new | doing | accepted | done | closed
+  reply           TEXT NOT NULL DEFAULT '',
+  replied_at      TIMESTAMPTZ,
+  reply_seen      BOOLEAN NOT NULL DEFAULT true,        -- false while the user has an unread reply
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS feedback_status_idx ON feedback(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS feedback_user_idx ON feedback(user_id, created_at DESC);
+
 -- Posts: status may also be 'hidden' (by an admin).
 CREATE TABLE IF NOT EXISTS post_reports (
   id              BIGSERIAL PRIMARY KEY,
