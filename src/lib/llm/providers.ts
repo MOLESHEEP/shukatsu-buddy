@@ -1,4 +1,5 @@
 import "server-only";
+import { getLlmSettings, openSecret, type LlmSettings } from "../settings";
 
 /**
  * LLM provider registry.
@@ -173,49 +174,68 @@ export type ResolvedProvider = ProviderPreset & {
   configured: boolean;
   /** Why it is not usable, for the settings page. */
   missing: string | null;
+  /** Where the API key came from. */
+  keySource: "admin" | "env" | null;
 };
 
-export function resolveProvider(id: string): ResolvedProvider | null {
+/**
+ * Resolves a provider's effective config. Values saved in the admin console (settings)
+ * take precedence over the .env file; the .env file over built-in defaults.
+ */
+export function resolveProvider(id: string, settings?: LlmSettings): ResolvedProvider | null {
   const p = PROVIDERS.find((x) => x.id === id);
   if (!p) return null;
   const ID = p.id.toUpperCase();
-  const apiKey = p.keyEnvs.map(env).find(Boolean);
-  const baseUrl = (env(`${ID}_BASE_URL`) ?? p.defaultBaseUrl).replace(/\/+$/, "");
-  const model = env(`${ID}_MODEL`) ?? p.defaultModel;
+  const o = settings?.providers[p.id] ?? {};
+  const dbKey = openSecret(o.apiKey) ?? undefined;
+  const apiKey = dbKey ?? p.keyEnvs.map(env).find(Boolean);
+  const baseUrl = (o.baseUrl?.trim() || env(`${ID}_BASE_URL`) || p.defaultBaseUrl).replace(/\/+$/, "");
+  const explicitModel = o.model?.trim() || env(`${ID}_MODEL`);
+  const model = explicitModel ?? p.defaultModel;
   const jsonEnv = env(`${ID}_JSON_MODE`) as JsonMode | undefined;
   const json = jsonEnv && ["json_schema", "json_object", "none"].includes(jsonEnv) ? jsonEnv : p.json;
 
   let missing: string | null = null;
-  if (p.needsKey && !apiKey) missing = `未设置 ${p.keyEnvs[0]}`;
-  else if (!baseUrl) missing = `未设置 ${ID}_BASE_URL`;
-  else if (!model) missing = `未设置 ${ID}_MODEL`;
+  if (o.apiKey && !dbKey) missing = "保存的 API Key 无法解密（AUTH_SECRET 可能已更改），请重新填写";
+  else if (p.needsKey && !apiKey) missing = `未设置 API Key（${p.keyEnvs[0]}）`;
+  else if (!baseUrl) missing = "未设置接口地址";
+  else if (!model) missing = "未设置模型";
   // Keyless providers only count as configured once the operator opted in by naming a model.
-  if (!p.needsKey && !env(`${ID}_MODEL`)) missing ??= `未设置 ${ID}_MODEL`;
+  if (!p.needsKey && !explicitModel) missing ??= "未设置模型";
 
-  return { ...p, apiKey, baseUrl, model, json, configured: !missing, missing };
+  return { ...p, apiKey, baseUrl, model, json, configured: !missing, missing, keySource: dbKey ? "admin" : apiKey ? "env" : null };
 }
 
-export function allProviders() {
-  return PROVIDERS.map((p) => resolveProvider(p.id)!);
+export function allProviders(settings?: LlmSettings) {
+  return PROVIDERS.map((p) => resolveProvider(p.id, settings)!);
+}
+
+/** Primary/fallback choice: admin console first, then .env. */
+export function routing(settings?: LlmSettings) {
+  return {
+    primary: (settings?.primary ?? env("LLM_PROVIDER") ?? "auto").toLowerCase(),
+    fallback: settings?.fallback ?? (env("LLM_FALLBACK") ?? "").split(/[,\s]+/).map((s) => s.toLowerCase()).filter(Boolean),
+  };
 }
 
 /**
- * The ordered chain of providers to try.
- * LLM_PROVIDER picks the primary (default "auto" = first configured in registry order);
- * LLM_FALLBACK="deepseek,kimi" adds backups used when the primary errors or is unreachable.
+ * The ordered chain of providers to try: the primary ("auto" = first configured in registry order)
+ * followed by configured fallbacks, used when the primary errors or is unreachable.
  * Returns [] for demo mode.
  */
-export function providerChain(): ResolvedProvider[] {
-  const choice = (env("LLM_PROVIDER") ?? "auto").toLowerCase();
+export function providerChain(settings?: LlmSettings): ResolvedProvider[] {
+  const { primary: choice, fallback } = routing(settings);
   if (choice === "mock") return [];
-  const configured = allProviders().filter((p) => p.configured);
-  const primary = choice === "auto" ? configured[0] : resolveProvider(choice);
+  const configured = allProviders(settings).filter((p) => p.configured);
+  const primary = choice === "auto" ? configured[0] : resolveProvider(choice, settings);
   if (!primary) return [];
-  const fallbacks = (env("LLM_FALLBACK") ?? "")
-    .split(/[,\s]+/)
-    .map((s) => s.toLowerCase())
-    .filter((id) => id && id !== primary.id)
-    .map((id) => resolveProvider(id))
+  const fallbacks = fallback
+    .filter((id) => id !== primary.id)
+    .map((id) => resolveProvider(id, settings))
     .filter((p): p is ResolvedProvider => !!p && p.configured);
   return [primary, ...fallbacks];
+}
+
+export async function currentChain() {
+  return providerChain(await getLlmSettings());
 }

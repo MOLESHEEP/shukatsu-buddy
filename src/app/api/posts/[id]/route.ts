@@ -20,8 +20,9 @@ async function own(userId: number, id: number) {
 
 export const PATCH = withUser<Ctx>(async (req, user, { params }) => {
   const id = idParam((await params).id);
-  await own(user.id, id);
+  const current = await own(user.id, id);
   const { post: p, action, confirmed } = await readJson(req, Body);
+  if (current.status === "hidden" && action !== "save") throw new HttpError(403, "这篇分享已被管理员隐藏，暂时不能重新发布");
 
   if (p) {
     await query(

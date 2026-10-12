@@ -2,22 +2,25 @@ import { z } from "zod";
 import { readJson, withUser } from "@/lib/api";
 import { queryOne } from "@/lib/db";
 import { parseEmail } from "@/lib/llm/tasks";
-import { checkQuota, recordUsage } from "@/lib/quota";
+import { query } from "@/lib/db";
+import { checkQuota } from "@/lib/quota";
+import { requireAi } from "@/lib/ai-access";
 
 export const maxDuration = 90;
 
 const Body = z.object({ raw: z.string().trim().min(10).max(20000) });
 
 export const POST = withUser(async (req, user) => {
-  checkQuota(user, "email");
+  await requireAi(user);
+  await checkQuota(user, "email");
   const { raw } = await readJson(req, Body);
-  const parsed = await parseEmail(raw);
+  const parsed = await parseEmail(raw, user.id);
   const row = await queryOne<{ id: string }>(`INSERT INTO emails (user_id, raw, parsed) VALUES ($1, $2, $3) RETURNING id`, [
     user.id,
     raw,
     JSON.stringify(parsed),
   ]);
-  await recordUsage(user.id, "email");
+  await query(`UPDATE users SET email_used = email_used + 1 WHERE id = $1`, [user.id]);
 
   // Suggest an existing company card for the confirmation step.
   let match: { id: number; name: string } | null = null;

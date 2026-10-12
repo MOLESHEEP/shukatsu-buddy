@@ -127,9 +127,57 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE INDEX IF NOT EXISTS posts_feed_idx ON posts(status, occurred_on DESC);
 CREATE INDEX IF NOT EXISTS posts_user_idx ON posts(user_id);
 
+-- ---------- v0.4: 管理员 ----------
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role         TEXT NOT NULL DEFAULT 'user';     -- user | admin
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status       TEXT NOT NULL DEFAULT 'active';   -- active | banned
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled   BOOLEAN;                          -- NULL = follow the site default
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+-- Per-user daily AI limits; NULL = use the site default from the admin console.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS limit_es     INT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS limit_email  INT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS limit_post   INT;
+-- Admin "reset today's count": usage before this moment is ignored for today's limit.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS quota_reset_at TIMESTAMPTZ;
+
+-- Runtime settings editable from the admin console (LLM providers, AI policy …).
+CREATE TABLE IF NOT EXISTS app_settings (
+  key             TEXT PRIMARY KEY,
+  value           JSONB NOT NULL,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- One row per AI call, for cost tracking in the admin overview.
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  task            TEXT NOT NULL,                        -- es | email | reply | post | test
+  provider        TEXT NOT NULL,
+  model           TEXT NOT NULL DEFAULT '',
+  ok              BOOLEAN NOT NULL,
+  ms              INT NOT NULL DEFAULT 0,
+  error           TEXT NOT NULL DEFAULT '',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ai_usage_time_idx ON ai_usage(created_at DESC);
+
 CREATE TABLE IF NOT EXISTS post_votes (
   post_id         BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (post_id, user_id)
 );
+
+-- Posts: status may also be 'hidden' (by an admin).
+CREATE TABLE IF NOT EXISTS post_reports (
+  id              BIGSERIAL PRIMARY KEY,
+  post_id         BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  reporter_id     BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  reason          TEXT NOT NULL,                        -- privacy | false | ad | offensive | other
+  detail          TEXT NOT NULL DEFAULT '',
+  status          TEXT NOT NULL DEFAULT 'open',         -- open | resolved | dismissed
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at     TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS post_reports_open_idx ON post_reports(status, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS post_reports_once_idx ON post_reports(post_id, reporter_id) WHERE status = 'open';

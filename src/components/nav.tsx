@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardCheck, House, LogOut, Mail, PenLine, Settings, SquareKanban, Users } from "lucide-react";
+import { ClipboardCheck, House, LogOut, Mail, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -14,7 +14,7 @@ const items = [
   { href: "/community", label: "经验", icon: Users },
 ];
 
-export function SideNav({ name, provider }: { name: string; provider: string }) {
+export function SideNav({ name, provider, isAdmin }: { name: string; provider: string | null; isAdmin: boolean }) {
   const path = usePathname();
   const router = useRouter();
   async function logout() {
@@ -29,7 +29,7 @@ export function SideNav({ name, provider }: { name: string; provider: string }) 
         就活小助手
       </Link>
       <nav className="mt-8 space-y-1">
-        {[...items, { href: "/settings", label: "设置", icon: Settings }].map((it) => {
+        {[...items, ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck }] : []), { href: "/settings", label: "设置", icon: Settings }].map((it) => {
           const active = path.startsWith(it.href);
           return (
             <Link
@@ -47,10 +47,12 @@ export function SideNav({ name, provider }: { name: string; provider: string }) 
         })}
       </nav>
       <div className="mt-auto space-y-3 px-2">
-        <div className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700">
-          <div className="font-medium">AI 引擎</div>
-          <div className="mt-0.5 truncate opacity-80">{provider}</div>
-        </div>
+        {provider && (
+          <Link href="/admin/ai" className="block rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700 hover:bg-violet-100">
+            <div className="font-medium">AI 引擎</div>
+            <div className="mt-0.5 truncate opacity-80">{provider}</div>
+          </Link>
+        )}
         <div className="flex items-center justify-between text-sm">
           <span className="truncate text-muted">{name}</span>
           <button onClick={logout} className="rounded-lg p-1.5 text-muted hover:bg-stone-50 hover:text-ink" title="退出登录">
@@ -83,16 +85,23 @@ export function BottomNav() {
   );
 }
 
-export function MobileTopBar() {
+export function MobileTopBar({ isAdmin }: { isAdmin: boolean }) {
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-cream/85 px-4 py-3 backdrop-blur md:hidden">
       <Link href="/dashboard" className="flex items-center gap-2 font-bold">
         <img src="/icon.svg" alt="" className="size-7" />
         就活小助手
       </Link>
-      <Link href="/settings" className="rounded-full p-2 text-muted hover:bg-paper" aria-label="设置">
-        <Settings className="size-5" />
-      </Link>
+      <div className="flex">
+        {isAdmin && (
+          <Link href="/admin" className="rounded-full p-2 text-violet-600 hover:bg-paper" aria-label="管理后台">
+            <ShieldCheck className="size-5" />
+          </Link>
+        )}
+        <Link href="/settings" className="rounded-full p-2 text-muted hover:bg-paper" aria-label="设置">
+          <Settings className="size-5" />
+        </Link>
+      </div>
     </header>
   );
 }

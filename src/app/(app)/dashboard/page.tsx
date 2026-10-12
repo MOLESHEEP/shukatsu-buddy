@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Building2, Mail, PenLine, Sparkles, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { stats, upcoming } from "@/lib/data";
-import { isDemoMode } from "@/lib/llm/provider";
+import { aiAccess } from "@/lib/ai-access";
 import { Card, EmptyState } from "@/components/ui";
 import { UpcomingList } from "@/components/upcoming-list";
 
@@ -22,7 +22,7 @@ function greeting() {
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const [items, s] = await Promise.all([upcoming(user.id, 0, 14), stats(user.id)]);
+  const [items, s, ai] = await Promise.all([upcoming(user.id, 0, 14), stats(user.id), aiAccess(user)]);
   const urgent = items.filter((i) => new Date(i.at).getTime() - Date.now() < 3 * 86400000).length;
 
   return (
@@ -42,13 +42,21 @@ export default async function Dashboard() {
         </p>
       </div>
 
-      {isDemoMode() && (
-        <div className="flex items-start gap-3 rounded-2xl bg-violet-50 px-4 py-3 text-sm text-violet-700">
+      {ai.demo && user.role === "admin" && (
+        <Link href="/admin/ai" className="flex items-start gap-3 rounded-2xl bg-violet-50 px-4 py-3 text-sm text-violet-700 hover:bg-violet-100">
           <Sparkles className="mt-0.5 size-4 shrink-0" />
           <p>
-            当前是<b>演示模式</b>：AI 功能返回示例结果。在 <code className="rounded bg-paper/70 px-1">.env</code> 中填写任意一家的 API Key（Claude、ChatGPT、DeepSeek、Kimi、通义千问、智谱 GLM、Gemini、豆包…）后重启即可使用真实 AI。
+            当前是<b>演示模式</b>：AI 功能返回示例结果。到「管理后台 → AI 与额度」填写任意一家的 API Key（Claude、ChatGPT、DeepSeek、Kimi、通义千问、智谱 GLM、Gemini、豆包…）即可使用真实 AI，无需重启。
           </p>
-        </div>
+        </Link>
+      )}
+      {!ai.allowed && (
+        <Link href="/settings" className="flex items-start gap-3 rounded-2xl bg-lemon-50 px-4 py-3 text-sm text-lemon-700 hover:bg-lemon-100">
+          <Sparkles className="mt-0.5 size-4 shrink-0" />
+          <p>
+            AI 功能尚未开通。把你的用户 ID <b className="font-mono">{user.id}</b> 发给管理员即可开通；在此之前可以手动写 ES、追踪选考和分享经验。
+          </p>
+        </Link>
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

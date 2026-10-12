@@ -3,9 +3,16 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { HttpError } from "../api";
-import { providerChain, resolveProvider, type ResolvedProvider } from "./providers";
+import { query } from "../db";
+import { getLlmSettings } from "../settings";
+import { currentChain, resolveProvider, type ResolvedProvider } from "./providers";
 
 export type Effort = "low" | "medium" | "high";
+
+/** Task names logged to ai_usage; daily limits count successful rows per task group. */
+export type AiTask = "es" | "es_retry" | "email" | "reply" | "post" | "test";
+
+export type CallContext = { userId: number | null; task: AiTask };
 
 export type GenerateOptions<T extends z.ZodType> = {
   system: string;
@@ -14,33 +21,52 @@ export type GenerateOptions<T extends z.ZodType> = {
   effort: Effort;
   /** Deterministic sample used in demo mode (no provider configured). */
   mock: () => z.infer<T>;
+  ctx: CallContext;
 };
 
 const TIMEOUT_MS = 120_000;
 
-export function isDemoMode() {
-  return providerChain().length === 0;
+export async function isDemoMode() {
+  return (await currentChain()).length === 0;
 }
 
-export function providerLabel(): string {
-  const chain = providerChain();
+export async function providerLabel(): Promise<string> {
+  const chain = await currentChain();
   if (!chain.length) return "演示模式（未配置 API Key）";
   const [p, ...rest] = chain;
   return `${p.label} · ${p.model ?? "未设置模型"}${rest.length ? `（备用：${rest.map((r) => r.label).join("、")}）` : ""}`;
 }
 
+async function logUsage(ctx: CallContext, p: { id: string; model: string | null }, ok: boolean, ms: number, error = "") {
+  await query(`INSERT INTO ai_usage (user_id, task, provider, model, ok, ms, error) VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
+    ctx.userId,
+    ctx.task,
+    p.id,
+    p.model ?? "",
+    ok,
+    ms,
+    error.slice(0, 300),
+  ]).catch((e) => console.error("[llm] usage log failed", e));
+}
+
 export async function generate<T extends z.ZodType>(opts: GenerateOptions<T>): Promise<z.infer<T>> {
-  const chain = providerChain();
+  const chain = await currentChain();
   if (!chain.length) {
     await new Promise((r) => setTimeout(r, 600));
-    return opts.mock();
+    const out = opts.mock();
+    await logUsage(opts.ctx, { id: "mock", model: "" }, true, 600);
+    return out;
   }
   let lastErr: unknown;
   for (const p of chain) {
+    const started = Date.now();
     try {
-      return await generateWith(p, opts);
+      const out = await generateWith(p, opts);
+      await logUsage(opts.ctx, p, true, Date.now() - started);
+      return out;
     } catch (err) {
       lastErr = err;
+      await logUsage(opts.ctx, p, false, Date.now() - started, err instanceof Error ? err.message : String(err));
       // Only fall through to the next provider for failures another vendor could fix.
       if (!(err instanceof HttpError) || ![429, 500, 502, 503, 504].includes(err.status)) throw err;
       console.warn(`[llm] ${p.id} failed (${err.message}); trying next provider`);
@@ -50,7 +76,7 @@ export async function generate<T extends z.ZodType>(opts: GenerateOptions<T>): P
 }
 
 /** Runs one generation on a specific provider (also used by the settings "测试连接" button). */
-export async function generateWith<T extends z.ZodType>(p: ResolvedProvider, opts: Omit<GenerateOptions<T>, "mock">): Promise<z.infer<T>> {
+export async function generateWith<T extends z.ZodType>(p: ResolvedProvider, opts: Omit<GenerateOptions<T>, "mock" | "ctx">): Promise<z.infer<T>> {
   if (!p.configured) throw new HttpError(500, `${p.label} 配置不完整：${p.missing}`);
   return p.protocol === "anthropic" ? generateAnthropic(p, opts) : generateOpenAICompatible(p, opts);
 }
@@ -59,7 +85,7 @@ export async function generateWith<T extends z.ZodType>(p: ResolvedProvider, opt
 
 const anthropicClients = new Map<string, Anthropic>();
 
-async function generateAnthropic<T extends z.ZodType>(p: ResolvedProvider, opts: Omit<GenerateOptions<T>, "mock">): Promise<z.infer<T>> {
+async function generateAnthropic<T extends z.ZodType>(p: ResolvedProvider, opts: Omit<GenerateOptions<T>, "mock" | "ctx">): Promise<z.infer<T>> {
   const key = `${p.baseUrl}|${p.apiKey}`;
   let client = anthropicClients.get(key);
   if (!client) {
@@ -104,7 +130,7 @@ type ChatResponse = {
   error?: { message?: string };
 };
 
-async function generateOpenAICompatible<T extends z.ZodType>(p: ResolvedProvider, opts: Omit<GenerateOptions<T>, "mock">): Promise<z.infer<T>> {
+async function generateOpenAICompatible<T extends z.ZodType>(p: ResolvedProvider, opts: Omit<GenerateOptions<T>, "mock" | "ctx">): Promise<z.infer<T>> {
   const schemaJson = jsonSchemaFor(opts.schema);
   // Every vendor's JSON mode requires the prompt itself to describe the expected JSON.
   const system = `${opts.system}\n\n只输出一个 JSON 对象，不要输出 JSON 以外的任何文字。JSON 必须符合以下 JSON Schema：\n${JSON.stringify(schemaJson)}`;
@@ -176,25 +202,31 @@ export function extractJson(text: string) {
 
 const PingSchema = z.object({ ok: z.boolean(), reply_ja: z.string() });
 
-export async function testProvider(id: string) {
-  const p = resolveProvider(id);
+export async function testProvider(id: string, userId: number) {
+  const p = resolveProvider(id, await getLlmSettings());
   if (!p) throw new HttpError(404, "未知的 AI 服务");
   const started = Date.now();
-  const out = await generateWith(p, {
-    system: "你是连接测试助手。",
-    prompt: '请返回 {"ok": true, "reply_ja": "<用一句日语打招呼>"}',
-    schema: PingSchema,
-    effort: "low",
-  });
-  return { provider: p.id, model: p.model, ms: Date.now() - started, reply: out.reply_ja };
+  try {
+    const out = await generateWith(p, {
+      system: "你是连接测试助手。",
+      prompt: '请返回 {"ok": true, "reply_ja": "<用一句日语打招呼>"}',
+      schema: PingSchema,
+      effort: "low",
+    });
+    await logUsage({ userId, task: "test" }, p, true, Date.now() - started);
+    return { provider: p.id, model: p.model, ms: Date.now() - started, reply: out.reply_ja };
+  } catch (err) {
+    await logUsage({ userId, task: "test" }, p, false, Date.now() - started, err instanceof Error ? err.message : "");
+    throw err;
+  }
 }
 
 /** GET /models on OpenAI-compatible providers (and Anthropic), so stale default model names are easy to fix. */
 export async function listModels(id: string): Promise<string[]> {
-  const p = resolveProvider(id);
+  const p = resolveProvider(id, await getLlmSettings());
   if (!p) throw new HttpError(404, "未知的 AI 服务");
-  if (p.needsKey && !p.apiKey) throw new HttpError(400, `未设置 ${p.keyEnvs[0]}`);
-  if (!p.baseUrl) throw new HttpError(400, `未设置 ${p.id.toUpperCase()}_BASE_URL`);
+  if (p.needsKey && !p.apiKey) throw new HttpError(400, "请先填写 API Key 并保存");
+  if (!p.baseUrl) throw new HttpError(400, "请先填写接口地址");
   const url = p.protocol === "anthropic" ? `${p.baseUrl}/v1/models?limit=100` : `${p.baseUrl}/models`;
   const headers: Record<string, string> =
     p.protocol === "anthropic" ? { "x-api-key": p.apiKey!, "anthropic-version": "2023-06-01" } : p.apiKey ? { authorization: `Bearer ${p.apiKey}` } : {};

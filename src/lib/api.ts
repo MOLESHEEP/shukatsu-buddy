@@ -26,6 +26,13 @@ export function withUser<Ctx>(handler: (req: Request, user: User, ctx: Ctx) => P
   };
 }
 
+export function withAdmin<Ctx>(handler: (req: Request, user: User, ctx: Ctx) => Promise<Response | unknown>) {
+  return withUser<Ctx>(async (req, user, ctx) => {
+    if (user.role !== "admin") throw new HttpError(403, "需要管理员权限");
+    return handler(req, user, ctx);
+  });
+}
+
 export function errorResponse(err: unknown) {
   if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
   if (err instanceof z.ZodError) {

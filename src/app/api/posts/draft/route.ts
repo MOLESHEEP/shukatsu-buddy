@@ -2,6 +2,8 @@ import { z } from "zod";
 import { readJson, withUser } from "@/lib/api";
 import { draftPost } from "@/lib/llm/tasks";
 import { sectionsToBody, timeLabel } from "@/lib/community";
+import { checkQuota } from "@/lib/quota";
+import { requireAi } from "@/lib/ai-access";
 
 export const maxDuration = 120;
 
@@ -19,7 +21,9 @@ const Body = z.object({
 });
 
 /** AI turns the user's rough description into an editable draft. Nothing is saved or published here. */
-export const POST = withUser(async (req) => {
+export const POST = withUser(async (req, user) => {
+  await requireAi(user);
+  await checkQuota(user, "post");
   const b = await readJson(req, Body);
   const extra =
     b.kind === "interview"
@@ -32,6 +36,6 @@ export const POST = withUser(async (req) => {
     timeLabel: timeLabel({ kind: b.kind, occurred_on: b.occurred_on, ended_on: b.ended_on ?? null, grad_year: b.grad_year ?? null }),
     extra: extra.filter(Boolean).join("；"),
     notes: b.notes,
-  });
+  }, user.id);
   return { ...draft, body: sectionsToBody(draft.sections) };
 });

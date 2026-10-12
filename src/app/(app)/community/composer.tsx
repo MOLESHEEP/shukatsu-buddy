@@ -10,7 +10,7 @@ import { api, errMsg } from "@/lib/client";
 
 export type ComposerInitial = {
   id?: number;
-  status?: "draft" | "published";
+  status?: "draft" | "published" | "hidden";
   kind: PostKind;
   company_name: string;
   industry: string;
@@ -38,7 +38,15 @@ const NOTE_HINTS: Record<PostKind, string> = {
     "随便写，想到什么写什么。\n例：新卒进去做后端开发，团队8个人，前辈很照顾。平时7点能走，发版前会加班。工资一般但住房补贴不错。公司帮忙办签证，外国人不少，日语要求商务水平。第二年开始可以自己负责项目，成长挺快。",
 };
 
-export function Composer({ initial, profileGradYear }: { initial: ComposerInitial; profileGradYear: number | null }) {
+export function Composer({
+  initial,
+  profileGradYear,
+  ai,
+}: {
+  initial: ComposerInitial;
+  profileGradYear: number | null;
+  ai: { allowed: boolean; left: number | null; userId: number };
+}) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(initial.id ? "edit" : "describe");
   const [f, setF] = useState<ComposerInitial>({ ...initial, grad_year: initial.grad_year ?? profileGradYear });
@@ -263,12 +271,17 @@ export function Composer({ initial, profileGradYear }: { initial: ComposerInitia
               <Button variant="ghost" disabled={!metaReady} onClick={() => setStep("edit")}>
                 跳过，自己写
               </Button>
-              <Button onClick={generate} loading={busy === "draft"} disabled={!metaReady || f.notes.trim().length < 15}>
+              <Button onClick={generate} loading={busy === "draft"} disabled={!metaReady || f.notes.trim().length < 15 || !ai.allowed || ai.left === 0}>
                 <WandSparkles className="size-4" />
-                {busy === "draft" ? "AI 正在整理…" : "AI 帮我整理"}
+                {busy === "draft" ? "AI 正在整理…" : ai.left === 0 ? "今天的 AI 整理次数已用完" : `AI 帮我整理${ai.left != null ? `（今天剩 ${ai.left} 次）` : ""}`}
               </Button>
             </div>
             {!metaReady && <p className="text-right text-xs text-muted">请先填写公司和时间</p>}
+            {!ai.allowed && (
+              <p className="rounded-xl bg-lemon-50 px-3.5 py-2.5 text-xs text-lemon-700">
+                AI 整理需要管理员开通（你的用户 ID：<b className="font-mono">{ai.userId}</b>）。现在可以点「跳过，自己写」直接撰写。
+              </p>
+            )}
           </Card>
         </>
       )}
@@ -330,6 +343,7 @@ export function Composer({ initial, profileGradYear }: { initial: ComposerInitia
                 <ArrowLeft className="size-4" /> {f.notes ? "回到描述 / 重新整理" : "修改基本信息"}
               </Button>
               <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                {f.status === "hidden" && <span className="self-center text-xs text-sakura-700">已被管理员隐藏，只能保存修改</span>}
                 {f.status !== "published" && (
                   <Button variant="soft" onClick={saveDraft} loading={busy === "save"} disabled={!f.title.trim() || f.body.trim().length < 20}>
                     保存草稿
@@ -341,7 +355,7 @@ export function Composer({ initial, profileGradYear }: { initial: ComposerInitia
                     setStep("preview");
                     window.scrollTo({ top: 0 });
                   }}
-                  disabled={!f.title.trim() || f.body.trim().length < 20}
+                  disabled={!f.title.trim() || f.body.trim().length < 20 || f.status === "hidden"}
                 >
                   预览{f.status === "published" ? "并更新" : "并发布"} →
                 </Button>

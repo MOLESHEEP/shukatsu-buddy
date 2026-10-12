@@ -10,10 +10,10 @@ type Props = {
   user: { display_name: string; email: string; grad_year: number | null; major: string; jp_level: string; plan: string; career_stage: string };
   icsUrl: string;
   aiPanel: React.ReactNode;
-  quota: { enforced: boolean; es: { used: number; limit: number }; email: { used: number; limit: number } };
+  passwordPanel: React.ReactNode;
 };
 
-export function SettingsForm({ user, icsUrl, aiPanel, quota }: Props) {
+export function SettingsForm({ user, icsUrl, aiPanel, passwordPanel }: Props) {
   const router = useRouter();
   const [form, setForm] = useState({ display_name: user.display_name, grad_year: user.grad_year ? String(user.grad_year) : "", major: user.major, jp_level: user.jp_level, career_stage: user.career_stage });
   const [saved, setSaved] = useState(false);
@@ -123,14 +123,7 @@ export function SettingsForm({ user, icsUrl, aiPanel, quota }: Props) {
         </Card>
 
         {aiPanel}
-
-        <Card className="space-y-2">
-          <h2 className="font-semibold">AI 使用量</h2>
-          <p className="text-sm">
-            <span className="text-muted">已使用：</span>ES 添削 {quota.es.used} 次 · 邮件识别 {quota.email.used} 次
-            {quota.enforced && <span className="text-muted">（免费版上限 {quota.es.limit} / {quota.email.limit}）</span>}
-          </p>
-        </Card>
+        {passwordPanel}
 
         <Card className="space-y-3">
           <h2 className="font-semibold">隐私与账号</h2>

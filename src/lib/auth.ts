@@ -2,7 +2,7 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
-import { queryOne } from "./db";
+import { query, queryOne } from "./db";
 
 export const SESSION_COOKIE = "sb_session";
 const SESSION_DAYS = 30;
@@ -57,21 +57,39 @@ export type User = {
   email_used: number;
   ics_token: string;
   career_stage: "student" | "working";
+  role: "user" | "admin";
+  status: "active" | "banned";
+  /** NULL = follow the site-wide default set by the admin. */
+  ai_enabled: boolean | null;
 };
 
+/** The signed-in user. Banned accounts are treated as signed out. */
 export async function getUser(): Promise<User | null> {
   const uid = await getUserId();
   if (!uid) return null;
-  return queryOne<User>(
-    `SELECT id, email, display_name, grad_year, major, jp_level, plan, es_used, email_used, ics_token, career_stage
+  const user = await queryOne<User>(
+    `SELECT id, email, display_name, grad_year, major, jp_level, plan, es_used, email_used, ics_token, career_stage,
+            role, status, ai_enabled
        FROM users WHERE id = $1`,
     [uid],
   );
+  if (!user || user.status !== "active") return null;
+  // Cheap activity tracking for the admin overview (at most one write per 10 minutes).
+  void query(`UPDATE users SET last_seen_at = now() WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '10 minutes')`, [
+    uid,
+  ]).catch(() => {});
+  return user;
 }
 
 /** For server components: redirects to /login when signed out. */
 export async function requireUser(): Promise<User> {
   const user = await getUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+export async function requireAdmin(): Promise<User> {
+  const user = await requireUser();
+  if (user.role !== "admin") redirect("/dashboard");
   return user;
 }

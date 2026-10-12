@@ -29,11 +29,14 @@ export function EsWorkbench({
   docs,
   initialCompanyId,
   initialDocId,
+  ai,
 }: {
   companies: { id: number; name: string }[];
   docs: EsDoc[];
   initialCompanyId: number | null;
   initialDocId: number | null;
+  /** left = remaining AI reviews today (null = unlimited) */
+  ai: { allowed: boolean; left: number | null; userId: number };
 }) {
   const router = useRouter();
   const initialDoc = docs.find((d) => d.id === initialDocId) ?? null;
@@ -50,6 +53,35 @@ export function EsWorkbench({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"history" | "library">("history");
+  const [saving, setSaving] = useState(false);
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+  const [manualTag, setManualTag] = useState<string>("");
+
+  /** Save the user's own text as-is: no AI, no limit. */
+  async function saveManual() {
+    setSaving(true);
+    setError(null);
+    setSavedNote(null);
+    try {
+      await api("/api/es", {
+        body: {
+          company_id: companyId === "" ? null : companyId,
+          company_name: companyName,
+          question,
+          char_limit: limit ? Number(limit) : null,
+          text: draft,
+          is_material: !!manualTag,
+          material_tag: manualTag,
+        },
+      });
+      setSavedNote(manualTag ? `已保存，并存入素材库（${manualTag}）` : "已保存到添削记录");
+      router.refresh();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const materials = useMemo(() => docs.filter((d) => d.is_material), [docs]);
   const draftCount = countChars(draft);
@@ -149,7 +181,7 @@ export function EsWorkbench({
           )}
 
           <Field
-            label="你的草稿"
+            label={ai.allowed ? "你的草稿" : "你的 ES"}
             hint={
               <span className={cx("tabular-nums", limit && draftCount > Number(limit) && "text-lemon-700")}>
                 {draftCount} 字{limit ? ` / ${limit}` : ""}
@@ -181,10 +213,32 @@ export function EsWorkbench({
           )}
 
           <ErrorNote message={error} />
-          <Button onClick={submit} loading={loading} disabled={!question.trim() || draft.trim().length < 10} className="w-full">
-            <WandSparkles className="size-4" />
-            {loading ? "AI 正在添削…（约 20–60 秒）" : "开始添削"}
-          </Button>
+          {savedNote && <p className="rounded-xl bg-mint-50 px-3.5 py-2.5 text-sm text-mint-700">✓ {savedNote}</p>}
+
+          {ai.allowed ? (
+            <Button onClick={submit} loading={loading} disabled={!question.trim() || draft.trim().length < 10 || ai.left === 0} className="w-full">
+              <WandSparkles className="size-4" />
+              {loading ? "AI 正在添削…（约 20–60 秒）" : ai.left === 0 ? "今天的 AI 添削次数已用完" : `AI 添削${ai.left != null ? `（今天剩 ${ai.left} 次）` : ""}`}
+            </Button>
+          ) : (
+            <p className="rounded-xl bg-lemon-50 px-3.5 py-2.5 text-xs leading-relaxed text-lemon-700">
+              你的账号还没有开通 AI 添削（用户 ID <b className="font-mono">{ai.userId}</b>，发给管理员即可开通）。现在可以自己写好后直接保存。
+            </p>
+          )}
+          <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-line p-3 sm:flex-row sm:items-center">
+            <span className="text-xs text-muted sm:flex-1">不用 AI，把上面的内容直接保存{ai.allowed ? "（不占用次数）" : ""}</span>
+            <Select className="w-auto py-1.5 text-xs" value={manualTag} onChange={(e) => setManualTag(e.target.value)} aria-label="同时存入素材库">
+              <option value="">不存入素材库</option>
+              {MATERIAL_TAGS.map((t) => (
+                <option key={t} value={t}>
+                  存为素材：{t}
+                </option>
+              ))}
+            </Select>
+            <Button variant={ai.allowed ? "soft" : "primary"} size="sm" onClick={saveManual} loading={saving} disabled={!question.trim() || !draft.trim()}>
+              直接保存
+            </Button>
+          </div>
         </Card>
 
         <div id="es-result" className="scroll-mt-6">
@@ -355,6 +409,7 @@ function DocList({ docs, mode, onOpen }: { docs: EsDoc[]; mode: "history" | "lib
           <button onClick={() => onOpen(d, mode === "library")} className="min-w-0 flex-1 text-left">
             <div className="flex items-center gap-2">
               {d.is_material && <Badge tone="violet">{d.material_tag || "素材"}</Badge>}
+              {!d.review && <Badge tone="stone">手动</Badge>}
               <span className="truncate text-sm font-medium">{d.question}</span>
             </div>
             <div className="mt-0.5 truncate text-xs text-muted">

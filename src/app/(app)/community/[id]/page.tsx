@@ -6,13 +6,14 @@ import { getPost } from "@/lib/posts";
 import { staleness } from "@/lib/community";
 import { Badge, Card } from "@/components/ui";
 import { PostBody, PostMeta, authorLabel } from "@/components/post-view";
-import { OwnerActions, VoteButton } from "./actions";
+import { AdminPostActions, OwnerActions, ReportButton, VoteButton } from "./actions";
 
 export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const post = await getPost(user.id, id);
+  const isAdmin = user.role === "admin";
+  const post = await getPost(user.id, id, isAdmin);
   if (!post) notFound();
   const mine = post.user_id === user.id;
   const stale = staleness(post);
@@ -28,6 +29,11 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <Badge tone="lemon" className="mb-3">
             草稿 · 仅自己可见
           </Badge>
+        )}
+        {post.status === "hidden" && (
+          <p className="mb-4 rounded-xl bg-sakura-50 px-3.5 py-2.5 text-sm text-sakura-700">
+            {mine ? "这篇分享因被举报已由管理员隐藏，其他用户看不到。如有疑问请联系管理员。" : "这篇分享已被管理员隐藏（仅管理员和作者可见）。"}
+          </p>
         )}
         <div className="text-sm text-muted">
           <span className="font-semibold text-ink">{post.company_name}</span>
@@ -67,7 +73,11 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       </Card>
 
       {mine && <OwnerActions id={post.id} status={post.status} />}
-      <p className="text-center text-xs text-muted">内容为作者个人经历与观点，仅供参考。</p>
+      {isAdmin && !mine && <AdminPostActions id={post.id} status={post.status} />}
+      <div className="flex items-center justify-center gap-3 text-xs text-muted">
+        <span>内容为作者个人经历与观点，仅供参考。</span>
+        {!mine && post.status === "published" && <ReportButton id={post.id} />}
+      </div>
     </div>
   );
 }

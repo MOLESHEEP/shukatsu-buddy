@@ -2,7 +2,8 @@ import { z } from "zod";
 import { readJson, withUser } from "@/lib/api";
 import { query, queryOne } from "@/lib/db";
 import { countChars, reviewEs } from "@/lib/llm/tasks";
-import { checkQuota, recordUsage } from "@/lib/quota";
+import { checkQuota } from "@/lib/quota";
+import { requireAi } from "@/lib/ai-access";
 
 export const maxDuration = 120;
 
@@ -15,7 +16,8 @@ const Body = z.object({
 });
 
 export const POST = withUser(async (req, user) => {
-  checkQuota(user, "es");
+  await requireAi(user);
+  await checkQuota(user, "es");
   const b = await readJson(req, Body);
 
   let companyName = b.company_name;
@@ -33,21 +35,21 @@ export const POST = withUser(async (req, user) => {
 
   const limit = b.char_limit ?? null;
   const input = { company: companyName, question: b.question, charLimit: limit, draft: b.draft, companyNotes, profile: user };
-  let review = await reviewEs(input);
+  let review = await reviewEs(input, user.id);
   let count = countChars(review.rewritten);
-  // The model occasionally overshoots the limit; one tightening pass usually fixes it.
+  // The model occasionally overshoots the limit; one tightening pass (not counted toward the daily limit) usually fixes it.
   if (limit && count > limit) {
-    review = await reviewEs({ ...input, tighten: { previous: review.rewritten, count } });
+    review = await reviewEs({ ...input, tighten: { previous: review.rewritten, count } }, user.id);
     count = countChars(review.rewritten);
   }
 
-  const doc = await queryOne<{ id: string }>(
+  const doc = await queryOne<{ id: number }>(
     `INSERT INTO es_docs (user_id, company_id, company_name, question, char_limit, draft, rewritten, review)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
     [user.id, b.company_id ?? null, companyName, b.question, limit, b.draft, review.rewritten, JSON.stringify(review)],
   );
-  await recordUsage(user.id, "es");
-  return { id: Number(doc!.id), review, count, limit, over: !!limit && count > limit };
+  await query(`UPDATE users SET es_used = es_used + 1 WHERE id = $1`, [user.id]);
+  return { id: doc!.id, review, count, limit, over: !!limit && count > limit };
 });
 
 export const GET = withUser(async (_req, user) => {

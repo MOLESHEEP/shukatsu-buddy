@@ -14,6 +14,14 @@ export const POST_RESULTS: Record<string, { label: string; tone: string }> = {
   unknown: { label: "未说明", tone: "stone" },
 };
 
+export const REPORT_REASONS: Record<string, string> = {
+  privacy: "泄露他人隐私或公司机密",
+  false: "内容明显不实",
+  ad: "广告 / 引流",
+  offensive: "攻击、歧视或不当言论",
+  other: "其他",
+};
+
 export const INTERVIEW_STAGES = ["说明会 / 座谈会", "GD（小组讨论）", "笔试", "一次面试", "二次面试", "三次面试", "最终面试", "实习选考", "全流程"] as const;
 export const EMPLOYMENT_TYPES = ["新卒", "中途（转职）", "实习 / インターン", "派遣・契約", "アルバイト"] as const;
 
@@ -21,7 +29,7 @@ export type Post = {
   id: number;
   user_id: number;
   kind: PostKind;
-  status: "draft" | "published";
+  status: "draft" | "published" | "hidden";
   company_name: string;
   industry: string;
   role: string;

@@ -30,7 +30,20 @@ URL：https://zoom.us/j/1234567890
 
 type ParseResult = { id: number; parsed: EmailParse; match: { id: number; name: string } | null };
 
-export function Inbox({ companies, userName }: { companies: { id: number; name: string }[]; userName: string }) {
+type Ai = { allowed: boolean; left: number | null; userId: number };
+
+function AiBlocked({ ai }: { ai: Ai }) {
+  if (!ai.allowed)
+    return (
+      <p className="rounded-xl bg-lemon-50 px-3.5 py-2.5 text-xs leading-relaxed text-lemon-700">
+        邮件助手需要 AI 功能，你的账号还没有开通。把用户 ID <b className="font-mono">{ai.userId}</b> 发给管理员即可开通。
+      </p>
+    );
+  if (ai.left === 0) return <p className="rounded-xl bg-sakura-50 px-3.5 py-2.5 text-xs text-sakura-700">今天的邮件助手次数已用完，明天 0 点（日本时间）恢复。</p>;
+  return null;
+}
+
+export function Inbox({ companies, userName, ai }: { companies: { id: number; name: string }[]; userName: string; ai: Ai }) {
   const [tab, setTab] = useState<"parse" | "reply">("parse");
   const [replySeed, setReplySeed] = useState<{ original: string; company: string } | null>(null);
 
@@ -53,6 +66,7 @@ export function Inbox({ companies, userName }: { companies: { id: number; name: 
       </div>
       {tab === "parse" ? (
         <ParseView
+          ai={ai}
           companies={companies}
           onReply={(original, company) => {
             setReplySeed({ original, company });
@@ -60,7 +74,7 @@ export function Inbox({ companies, userName }: { companies: { id: number; name: 
           }}
         />
       ) : (
-        <ReplyView key={replySeed?.original ?? "empty"} seed={replySeed} userName={userName} />
+        <ReplyView key={replySeed?.original ?? "empty"} seed={replySeed} userName={userName} ai={ai} />
       )}
     </div>
   );
@@ -70,7 +84,7 @@ export function Inbox({ companies, userName }: { companies: { id: number; name: 
 
 type EventDraft = { keep: boolean; kind: string; title: string; starts_at: string; location: string; prep: string };
 
-function ParseView({ companies, onReply }: { companies: { id: number; name: string }[]; onReply: (original: string, company: string) => void }) {
+function ParseView({ companies, onReply, ai }: { companies: { id: number; name: string }[]; onReply: (original: string, company: string) => void; ai: Ai }) {
   const router = useRouter();
   const [raw, setRaw] = useState("");
   const [res, setRes] = useState<ParseResult | null>(null);
@@ -136,7 +150,8 @@ function ParseView({ companies, onReply }: { companies: { id: number; name: stri
           <Textarea lang="ja" rows={16} value={raw} onChange={(e) => setRaw(e.target.value)} placeholder="把邮件全文（包括标题）粘贴到这里…" />
         </Field>
         <ErrorNote message={!res ? error : null} />
-        <Button onClick={parse} loading={loading} disabled={raw.trim().length < 10} className="w-full bg-mint-500 hover:bg-mint-700">
+        <AiBlocked ai={ai} />
+        <Button onClick={parse} loading={loading} disabled={raw.trim().length < 10 || !ai.allowed || ai.left === 0} className="w-full bg-mint-500 hover:bg-mint-700">
           <Sparkles className="size-4" />
           {loading ? "AI 正在阅读…" : "识别邮件"}
         </Button>
@@ -268,7 +283,7 @@ function ParseView({ companies, onReply }: { companies: { id: number; name: stri
 
 // ---------------- Reply ----------------
 
-function ReplyView({ seed, userName }: { seed: { original: string; company: string } | null; userName: string }) {
+function ReplyView({ seed, userName, ai }: { seed: { original: string; company: string } | null; userName: string; ai: Ai }) {
   const [form, setForm] = useState({
     scenario: seed ? "accept" : "accept",
     company: seed?.company ?? "",
@@ -340,7 +355,8 @@ function ReplyView({ seed, userName }: { seed: { original: string; company: stri
           <Textarea lang="ja" rows={5} value={form.original} onChange={set("original")} />
         </Field>
         <ErrorNote message={error} />
-        <Button onClick={generate} loading={loading} className="w-full bg-mint-500 hover:bg-mint-700">
+        <AiBlocked ai={ai} />
+        <Button onClick={generate} loading={loading} disabled={!ai.allowed || ai.left === 0} className="w-full bg-mint-500 hover:bg-mint-700">
           <Sparkles className="size-4" /> 生成回信
         </Button>
       </Card>

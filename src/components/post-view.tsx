@@ -60,7 +60,11 @@ export function PostCard({ post, showStatus = false }: { post: Post; showStatus?
           </div>
           <h3 className="mt-1 font-semibold leading-snug">{post.title}</h3>
         </div>
-        {showStatus && <Badge tone={post.status === "published" ? "mint" : "lemon"}>{post.status === "published" ? "已发布" : "草稿"}</Badge>}
+        {showStatus && (
+          <Badge tone={post.status === "published" ? "mint" : post.status === "hidden" ? "rose" : "lemon"}>
+            {post.status === "published" ? "已发布" : post.status === "hidden" ? "已被隐藏" : "草稿"}
+          </Badge>
+        )}
       </div>
       <div className="mt-2.5">
         <PostMeta post={post} />

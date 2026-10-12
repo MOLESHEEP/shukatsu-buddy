@@ -41,7 +41,7 @@ export async function reviewEs(input: {
   companyNotes?: string;
   profile?: Profile;
   tighten?: { previous: string; count: number };
-}): Promise<EsReview> {
+}, userId: number | null): Promise<EsReview> {
   const limitLine = input.charLimit ? `${input.charLimit} 字以内` : "无明确上限（建议 400 字左右）";
   const prompt = [
     `【公司】${input.company || "未指定"}`,
@@ -63,6 +63,7 @@ export async function reviewEs(input: {
     schema: EsReviewSchema,
     effort: "medium",
     mock: () => mockEsReview(input.question, input.draft, input.charLimit),
+    ctx: { userId, task: input.tighten ? "es_retry" : "es" },
   });
 }
 
@@ -83,13 +84,14 @@ const EMAIL_SYSTEM = `你负责解析日本企业发给求职学生的日文邮�
   confidence 为 0–1；没有明确线索时 type=unknown 且 confidence 较低，并在 reason_zh 说明。
 - 有不确定的地方写进 uncertain_points_zh，提醒用户核对。`;
 
-export async function parseEmail(raw: string): Promise<EmailParse> {
+export async function parseEmail(raw: string, userId: number | null): Promise<EmailParse> {
   return generate({
     system: EMAIL_SYSTEM,
     prompt: `今天是 ${todayLocal()}（时区 ${APP_TZ}）。\n\n【邮件原文】\n${raw}`,
     schema: EmailParseSchema,
     effort: "low",
     mock: () => mockEmailParse(raw),
+    ctx: { userId, task: "email" },
   });
 }
 
@@ -108,7 +110,7 @@ export async function draftReply(input: {
   details?: string;
   name?: string;
   school?: string;
-}): Promise<ReplyDraft> {
+}, userId: number | null): Promise<ReplyDraft> {
   const prompt = [
     `【场景】${REPLY_SCENARIOS[input.scenario] ?? input.scenario}`,
     `【公司】${input.company || "【会社名】"}`,
@@ -125,6 +127,7 @@ export async function draftReply(input: {
     schema: ReplySchema,
     effort: "low",
     mock: () => mockReply(input.scenario, input.company, input.name),
+    ctx: { userId, task: "reply" },
   });
 }
 
@@ -151,7 +154,7 @@ export async function draftPost(input: {
   timeLabel: string;
   extra?: string;
   notes: string;
-}): Promise<PostDraft> {
+}, userId: number | null): Promise<PostDraft> {
   const prompt = [
     `【类型】${input.kind === "interview" ? "面试经验" : "工作体验"}`,
     `【公司】${input.company}`,
@@ -169,6 +172,7 @@ export async function draftPost(input: {
     schema: PostDraftSchema,
     effort: "medium",
     mock: () => mockPost(input.kind, input.company, input.notes),
+    ctx: { userId, task: "post" },
   });
 }
 

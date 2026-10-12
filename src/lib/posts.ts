@@ -26,7 +26,7 @@ function norm(r: Record<string, unknown>): Post {
 export type FeedFilter = { kind?: string; q?: string; year?: number; sort?: "recent" | "helpful" };
 
 export async function listFeed(viewerId: number, f: FeedFilter, limit = 50) {
-  const where = [`p.status = 'published'`];
+  const where = [`p.status = 'published'`, `u.status = 'active'`];
   const params: unknown[] = [viewerId];
   if (f.kind === "interview" || f.kind === "work") {
     params.push(f.kind);
@@ -53,11 +53,12 @@ export async function listMine(userId: number) {
   return rows.map(norm);
 }
 
-/** A published post, or the viewer's own draft. */
-export async function getPost(viewerId: number, id: number) {
+/** A published post by an active user, the viewer's own post (any status), or anything for admins. */
+export async function getPost(viewerId: number, id: number, isAdmin = false) {
   const row = await queryOne(
-    `SELECT ${COLUMNS} FROM posts p JOIN users u ON u.id = p.user_id WHERE p.id = $2 AND (p.status = 'published' OR p.user_id = $1)`,
-    [viewerId, id],
+    `SELECT ${COLUMNS} FROM posts p JOIN users u ON u.id = p.user_id
+      WHERE p.id = $2 AND ((p.status = 'published' AND u.status = 'active') OR p.user_id = $1 OR $3::boolean)`,
+    [viewerId, id, isAdmin],
   );
   return row ? norm(row) : null;
 }
@@ -74,7 +75,7 @@ export async function postsForCompany(viewerId: number, companyName: string, lim
   const clean = companyName.replace(/株式会社|（株）|\(株\)/g, "").trim() || companyName;
   const rows = await query(
     `SELECT ${COLUMNS} FROM posts p JOIN users u ON u.id = p.user_id
-      WHERE p.status = 'published'
+      WHERE p.status = 'published' AND u.status = 'active'
         AND (p.company_name ILIKE '%' || $2::text || '%'
              OR (length(replace(replace(p.company_name, '株式会社', ''), '（株）', '')) > 1
                  AND $3::text ILIKE '%' || replace(replace(p.company_name, '株式会社', ''), '（株）', '') || '%'))
