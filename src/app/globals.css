@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+/*
+  Design tokens — "mild, light, vivid".
+  Warm cream canvas, white cards, soft lines; colour comes from five pastel-but-saturated
+  accents (sakura, mint, sky, lemon, violet) used as tints with a deeper ink for text.
+*/
+@theme {
+  --font-sans: "Inter", "PingFang SC", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans SC", "Noto Sans JP",
+    "Microsoft YaHei", "Yu Gothic UI", system-ui, sans-serif;
+
+  --color-cream: #fbf8f3;
+  --color-paper: #ffffff;
+  --color-ink: #2f2a36;
+  --color-muted: #7d768a;
+  --color-line: #ece6dd;
+
+  --color-sakura-50: #fff1f3;
+  --color-sakura-100: #ffe0e6;
+  --color-sakura-300: #f9a8b8;
+  --color-sakura-500: #ef6f8a;
+  --color-sakura-600: #d9506e;
+  --color-sakura-700: #b33a56;
+
+  --color-mint-50: #ebfaf4;
+  --color-mint-100: #d3f3e6;
+  --color-mint-300: #8fdcbf;
+  --color-mint-500: #36b98a;
+  --color-mint-700: #1f7d5c;
+
+  --color-sky-50: #eef6ff;
+  --color-sky-100: #dcecff;
+  --color-sky-300: #9fc9f7;
+  --color-sky-500: #4c97e8;
+  --color-sky-700: #2a66ad;
+
+  --color-lemon-50: #fff9e6;
+  --color-lemon-100: #fff0bf;
+  --color-lemon-300: #f9d877;
+  --color-lemon-500: #e6b12e;
+  --color-lemon-700: #946b07;
+
+  --color-violet-50: #f5f1ff;
+  --color-violet-100: #e9e0ff;
+  --color-violet-300: #c5b1fb;
+  --color-violet-500: #8d6cf0;
+  --color-violet-700: #5d3fbf;
+
+  --color-stone-50: #f6f4f1;
+  --color-stone-100: #ece8e2;
+  --color-stone-500: #8f877c;
+  --color-stone-700: #5c554c;
+
+  --radius-card: 1.25rem;
+  --shadow-soft: 0 1px 2px rgb(47 42 54 / 0.04), 0 8px 24px -12px rgb(47 42 54 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(47 42 54 / 0.05), 0 16px 32px -16px rgb(239 111 138 / 0.35);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Soft blobs behind the app for a little life without noise. */
+.bg-blobs {
+  background-image:
+    radial-gradient(40rem 24rem at 110% -10%, rgb(255 224 230 / 0.7), transparent 60%),
+    radial-gradient(36rem 22rem at -10% 110%, rgb(211 243 230 / 0.6), transparent 60%),
+    radial-gradient(30rem 20rem at 50% 120%, rgb(220 236 255 / 0.5), transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--color-sakura-100);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-sakura-300);
+  outline-offset: 2px;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.35s ease-out both;
+}

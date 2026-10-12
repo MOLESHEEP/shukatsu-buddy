@@ -1,0 +1,97 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { ClipboardCheck, House, LogOut, Mail, PenLine, Settings, SquareKanban } from "lucide-react";
+import { cx } from "./ui";
+
+const items = [
+  { href: "/dashboard", label: "首页", icon: House },
+  { href: "/es", label: "ES添削", icon: PenLine },
+  { href: "/tracker", label: "选考", icon: SquareKanban },
+  { href: "/inbox", label: "邮件", icon: Mail },
+  { href: "/tests", label: "笔试", icon: ClipboardCheck },
+];
+
+export function SideNav({ name, provider }: { name: string; provider: string }) {
+  const path = usePathname();
+  const router = useRouter();
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
+  return (
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-paper/70 px-4 py-6 backdrop-blur md:flex">
+      <Link href="/dashboard" className="flex items-center gap-2 px-2 font-bold">
+        <img src="/icon.svg" alt="" className="size-8" />
+        就活小助手
+      </Link>
+      <nav className="mt-8 space-y-1">
+        {[...items, { href: "/settings", label: "设置", icon: Settings }].map((it) => {
+          const active = path.startsWith(it.href);
+          return (
+            <Link
+              key={it.href}
+              href={it.href}
+              className={cx(
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                active ? "bg-sakura-50 text-sakura-700" : "text-muted hover:bg-stone-50 hover:text-ink",
+              )}
+            >
+              <it.icon className="size-[18px]" />
+              {it.label === "选考" ? "选考追踪" : it.label === "邮件" ? "邮件助手" : it.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="mt-auto space-y-3 px-2">
+        <div className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700">
+          <div className="font-medium">AI 引擎</div>
+          <div className="mt-0.5 truncate opacity-80">{provider}</div>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="truncate text-muted">{name}</span>
+          <button onClick={logout} className="rounded-lg p-1.5 text-muted hover:bg-stone-50 hover:text-ink" title="退出登录">
+            <LogOut className="size-4" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+export function BottomNav() {
+  const path = usePathname();
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <div className="grid grid-cols-5">
+        {items.map((it) => {
+          const active = path.startsWith(it.href);
+          return (
+            <Link key={it.href} href={it.href} className={cx("flex flex-col items-center gap-0.5 py-2 text-[11px]", active ? "text-sakura-600" : "text-muted")}>
+              <span className={cx("rounded-full px-3 py-1 transition", active && "bg-sakura-50")}>
+                <it.icon className="size-5" />
+              </span>
+              {it.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+export function MobileTopBar() {
+  return (
+    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-cream/85 px-4 py-3 backdrop-blur md:hidden">
+      <Link href="/dashboard" className="flex items-center gap-2 font-bold">
+        <img src="/icon.svg" alt="" className="size-7" />
+        就活小助手
+      </Link>
+      <Link href="/settings" className="rounded-full p-2 text-muted hover:bg-paper" aria-label="设置">
+        <Settings className="size-5" />
+      </Link>
+    </header>
+  );
+}

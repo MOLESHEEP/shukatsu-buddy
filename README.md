@@ -1,0 +1,349 @@
+# 就活小助手 · Shukatsu Buddy
+
+> 面向在日中国留学生的 AI 就活助手 —— **中文操作，日文产出**。
+> An AI job-hunting assistant for Chinese international students in Japan: think in Chinese, apply in Japanese.
+
+ES 添削、选考追踪、日文邮件识别、笔试类型管理，一个 `docker compose up` 就能部署到你自己的服务器。
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+---
+
+## 目录
+
+- [功能一览](#功能一览)
+- [快速开始（Docker，推荐）](#快速开始docker推荐)
+- [部署到你的网站](#部署到你的网站)
+- [接入大模型](#接入大模型)
+- [使用指南](#使用指南)
+- [设计理念](#设计理念)
+- [技术架构](#技术架构)
+- [本地开发](#本地开发)
+- [配置项](#配置项)
+- [与 PRD 的对应关系 & 路线图](#与-prd-的对应关系--路线图)
+
+---
+
+## 功能一览
+
+| 模块 | 你能做什么 | AI 参与 |
+| --- | --- | --- |
+| ✍️ **ES 添削** | 输入公司、题目、字数上限和草稿（中文/日文都行），得到日文改写稿、逐句中文说明、三项结构评分 | Claude 按结构化 JSON 输出；超字数时自动再压缩一次 |
+| 📚 **素材库** | 把写好的ガクチカ、自己PR 存起来，写别家公司时一键导入再按公司调整 | — |
+| 🗂️ **选考追踪** | 看板（拖拽改阶段）+ 月历视图；每家公司的阶段可增删、记录日期与结果（通过/未通过/待定） | — |
+| 💌 **邮件识别** | 粘贴企业日文来信 → 提取日期、地点/链接、所需材料、回复期限、笔试类型 → 确认后写入公司卡片 | 结构化抽取 + 置信度 + 不确定点提示 |
+| ↩️ **回信辅助** | 接受面试、调整日程、辞退选考/内定、感谢信等场景，生成符合商务敬语的日文回信 | 不确定信息用【　】留空，绝不编造 |
+| 📝 **笔试准备** | 按笔试类型（SPI / 玉手箱 / TG-WEB / GAB / CAB / クレペリン…）汇总公司，提示优先准备哪一种，附备考要点和留学生易失分点 | 邮件中自动识别类型 |
+| 📅 **提醒** | 每个用户一条私有日历订阅链接（.ics），手机日历自动提醒：截止前 3 天 & 1 天、面试前一晚 | — |
+| 📊 **复盘统计** | 投递数、进行中、内定、各阶段通过率 | — |
+| 🔒 **隐私** | 数据按用户隔离；设置页一键删除全部数据 / 注销账号 | — |
+
+<table>
+<tr>
+<td><img src="docs/screenshots/es-result.png" alt="ES 添削"></td>
+<td><img src="docs/screenshots/inbox-result.png" alt="邮件识别"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/tracker.png" alt="看板"></td>
+<td><img src="docs/screenshots/tracker-calendar.png" alt="日历"></td>
+</tr>
+</table>
+
+---
+
+## 快速开始（Docker，推荐）
+
+只需要安装 [Docker](https://docs.docker.com/get-docker/)（含 Docker Compose v2）。
+
+```bash
+git clone https://github.com/MOLESHEEP/shukatsu-buddy.git
+cd shukatsu-buddy
+
+cp .env.example .env
+# 编辑 .env：至少修改 AUTH_SECRET 和 POSTGRES_PASSWORD
+#   AUTH_SECRET 可以用：openssl rand -base64 32
+# 想用真实 AI：填 ANTHROPIC_API_KEY（或 OpenAI 兼容的 Key）
+
+docker compose up -d --build
+```
+
+打开 <http://localhost:3000>，注册账号即可使用。
+
+> **没有 API Key 也能跑**：未配置任何 Key 时自动进入「演示模式」，AI 功能返回示例结果，方便先体验完整流程。
+
+常用命令：
+
+```bash
+docker compose logs -f app        # 查看日志
+docker compose pull && docker compose up -d   # 更新（使用预构建镜像时）
+docker compose down               # 停止（数据保留在 pgdata 卷中）
+docker compose down -v            # 停止并删除所有数据（慎用）
+```
+
+数据库表结构会在首次访问时自动创建，无需手动迁移。
+
+---
+
+## 部署到你的网站
+
+### 方式一：服务器上直接构建（最简单）
+
+在任意 Linux VPS（1 vCPU / 1 GB 内存即可）上执行上面的「快速开始」，然后：
+
+**自带 HTTPS（推荐）** —— 项目内置了 [Caddy](https://caddyserver.com/) 反向代理，会自动申请 Let's Encrypt 证书：
+
+```bash
+# 1. 把域名的 A 记录指向服务器 IP
+# 2. 在 .env 中设置：
+#      DOMAIN=shukatsu.your-site.com
+#      PUBLIC_URL=https://shukatsu.your-site.com
+# 3. 启动（带 https profile）
+docker compose --profile https up -d --build
+```
+
+服务器需要开放 80 / 443 端口。
+
+**已有 Nginx / 宝塔 / 1Panel 等反向代理？** 不启用 https profile，直接把你的代理指向 `http://127.0.0.1:3000`（可用 `APP_PORT` 修改端口），并转发 `X-Forwarded-Proto` 头。
+
+### 方式二：使用预构建镜像（不在服务器上编译）
+
+推送到 `main` 分支后，GitHub Actions（`.github/workflows/docker.yml`）会自动构建 `linux/amd64` + `linux/arm64` 镜像并发布到 GitHub Container Registry：
+
+```bash
+# .env 中添加：
+APP_IMAGE=ghcr.io/molesheep/shukatsu-buddy:latest
+
+docker compose pull
+docker compose up -d --no-build
+```
+
+> 镜像默认是私有包。如需匿名拉取，请在 GitHub → Packages → shukatsu-buddy → Package settings 中改为 Public，或在服务器上 `docker login ghcr.io`。
+
+### 方式三：其他容器平台
+
+`Dockerfile` 产出的是标准的单容器 Node 服务（端口 3000，健康检查 `/api/health`），可直接部署到 Railway、Render、Fly.io、Google Cloud Run、Azure Container Apps、Kubernetes 等。只需要：
+
+- 一个 PostgreSQL 数据库，把连接串填入 `DATABASE_URL`
+- 设置 `AUTH_SECRET`、`PUBLIC_URL` 以及 LLM 相关环境变量
+
+### 备份
+
+```bash
+docker compose exec db pg_dump -U shukatsu shukatsu > backup.sql          # 备份
+docker compose exec -T db psql -U shukatsu shukatsu < backup.sql          # 恢复
+```
+
+---
+
+## 接入大模型
+
+所有 AI 调用集中在 `src/lib/llm/`，通过 `LLM_PROVIDER` 选择后端：
+
+| `LLM_PROVIDER` | 说明 | 需要的变量 |
+| --- | --- | --- |
+| `auto`（默认） | 有 `ANTHROPIC_API_KEY` 用 Claude；否则有 `OPENAI_API_KEY` 用 OpenAI 兼容接口；都没有则进入演示模式 | — |
+| `anthropic` | **推荐**。使用 Anthropic 官方 SDK + 结构化输出（JSON Schema 约束），返回格式有保证 | `ANTHROPIC_API_KEY`，可选 `ANTHROPIC_MODEL`（默认 `claude-opus-5-5`） |
+| `openai` | 任意 OpenAI 兼容接口：DeepSeek、通义千问（DashScope）、Moonshot、智谱、Ollama、vLLM… 使用 JSON mode + Zod 校验，失败自动重试一次 | `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL` |
+| `mock` | 演示模式，返回固定示例 | — |
+
+示例：
+
+```bash
+# Claude（推荐）
+ANTHROPIC_API_KEY=sk-ant-...
+
+# DeepSeek
+LLM_PROVIDER=openai
+OPENAI_BASE_URL=https://api.deepseek.com/v1
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=deepseek-chat
+
+# 本地 Ollama（容器内访问宿主机）
+LLM_PROVIDER=openai
+OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+OPENAI_API_KEY=ollama
+OPENAI_MODEL=qwen2.5:14b
+```
+
+**Claude 调用细节**
+
+- 使用 `client.beta.messages.parse()` + Zod schema（`src/lib/llm/schemas.ts`），模型输出被约束为合法 JSON，直接写入数据库和渲染页面。
+- 按任务设置推理强度（`effort`）：ES 添削用 `medium`，邮件解析和回信用 `low`，兼顾质量与速度/成本。
+- 默认开启服务端 **refusal fallback**（`fallbacks: "default"`）：极少数情况下安全分类器误拒时，API 会自动换模型重试。如通过代理或不支持该参数的平台访问，可设置 `ANTHROPIC_FALLBACKS=off` 关闭。
+- 对 `refusal` / `max_tokens` 停止原因和限流、鉴权错误都有中文提示。
+
+**提示词**集中在 `src/lib/llm/tasks.ts`，与代码分开维护，方便持续打磨。
+
+---
+
+## 使用指南
+
+1. **注册** → 在「设置」里填写毕业年份、专业、日语水平（AI 改 ES 时会参考）。
+2. **添加公司**：首页或「选考」页点「添加公司」。会自动建立标准流程：エントリー → 说明会 → ES提交 → 笔试 → 一次面试 → 二次面试 → 最终面试 → 内定。在公司详情页可以增删、排序阶段，记录每一步的日期和结果。
+3. **写 ES**：在公司详情页点「为这家公司写 ES」，公司备注会作为背景提供给 AI。选择题目模板（志望動機 / ガクチカ / 日本就職…）或自己输入，粘贴草稿后点「开始添削」。满意的回答点「存入素材库」。
+4. **收到企业邮件**：复制全文到「邮件助手 → 邮件识别」，核对 AI 提取的日程和笔试类型，选择对应公司后「确认写入」。需要回复时点「帮我写回信」。
+5. **订阅提醒**：「设置 → 日历订阅」复制链接，在 iPhone「设置 → 日历 → 账户 → 添加已订阅的日历」或 Google 日历「通过网址添加」，之后所有日程会自动同步并提醒。
+6. **准备笔试**：「笔试」页按类型汇总你的公司，告诉你优先准备哪一种。
+7. **手机上使用**：用浏览器打开网站后「添加到主屏幕」，即可像 App 一样使用（PWA）。
+
+---
+
+## 设计理念
+
+### 产品原则
+
+- **辅导，而不是代写**。ES 改写保留学生自己的经历和观点，绝不编造数字或成果；每处修改都附中文说明和「日本人事会怎么理解」，目的是让用户真正学会。这也降低了诚信风险。
+- **中文思考，日文表达**。所有界面、解释、摘要都用中文；所有要交给企业的东西（ES、回信）都是地道的日文。
+- **AI 只做建议，人来确认**。邮件识别的结果先展示、可编辑，用户确认后才写入；置信度低或不确定的地方会明确标出。
+- **免费的部分留住用户，AI 的部分产生价值**。选考追踪永久免费；ES 添削和 AI 识别是付费驱动（可用 `ENFORCE_QUOTA` 开启 PRD 中的免费额度）。
+- **隐私优先**。数据只属于用户本人，不做公开汇总，一键删除。
+
+### 视觉设计：温和 · 轻盈 · 鲜活
+
+就活本身压力很大，所以界面刻意做得**安静、柔和、有一点点可爱**：
+
+| 设计决策 | 做法 |
+| --- | --- |
+| **温和**的底色 | 暖米白画布 `#FBF8F3` + 纯白卡片，避免冷冰冰的灰白；极淡的径向渐变色块作为背景氛围 |
+| **轻盈**的结构 | 大圆角（20px）、柔和的双层阴影、细描边；信息分块但不堆叠边框；充足留白 |
+| **鲜活**的点缀 | 五个「粉彩但饱和」的强调色，各有语义：🌸 樱粉 = 主操作 / ES；🌿 薄荷 = 邮件 / 完成；☁️ 天蓝 = 说明会 / 进行中；🍋 柠檬 = 笔试 / 提醒；🪻 紫罗兰 = 面试 / AI |
+| 颜色的用法 | 强调色主要以 50/100 的淡底 + 700 的深字出现（徽章、提示框），只有主按钮使用实色，保证鲜活但不刺眼 |
+| 紧迫感分级 | 截止日按「今天/明天 → 3 天内 → 更远」用樱粉 → 柠檬 → 天蓝区分，一眼看出轻重缓急 |
+| 微动效 | 卡片淡入上浮、悬停轻微抬起、按钮按下回弹；不做多余动画 |
+| 中日文排版 | 字体栈同时覆盖简体中文与日文（PingFang / Hiragino / Noto Sans CJK / Yu Gothic），日文段落使用 `lang="ja"` 和更大行高 |
+| 移动优先 | 手机上底部 Tab 栏 + 弹出式表单（bottom sheet），桌面上侧边栏；看板在触屏上用下拉菜单代替拖拽 |
+
+所有设计 token 定义在 `src/app/globals.css` 的 `@theme` 中，改主题只需改这一处。
+
+### 易用性
+
+- 首页三个大入口覆盖 90% 的操作：添削 ES、识别邮件、添加公司。
+- 所有表单都有示例占位符；邮件助手有「填入示例」一键体验。
+- 未配置 API Key 也能完整体验（演示模式），降低部署门槛。
+
+---
+
+## 技术架构
+
+```
+浏览器 (PWA, React 19)
+   │
+   ▼
+Next.js 16 App Router ──────────────────────────────┐
+   │  Server Components：直接查询数据库渲染页面        │
+   │  Route Handlers  ：/api/* JSON 接口               │
+   │  proxy.ts        ：未登录访问重定向                 │
+   │                                                    │
+   ├── src/lib/db.ts      pg 连接池 + 自动建表 (db/schema.sql)
+   ├── src/lib/auth.ts    bcrypt 密码 + JWT(HS256) httpOnly Cookie
+   ├── src/lib/data.ts    数据访问（全部按 user_id 隔离）
+   └── src/lib/llm/       provider.ts  Claude / OpenAI 兼容 / 演示
+                          schemas.ts   Zod 结构化输出定义
+                          tasks.ts     提示词：ES 添削 / 邮件解析 / 回信
+   │
+   ▼
+PostgreSQL 17
+```
+
+**容器化**
+
+- `Dockerfile`：三阶段构建（deps → build → run），Next.js `standalone` 输出，非 root 用户运行，内置健康检查，镜像约 150 MB。
+- `docker-compose.yml`：`db`（Postgres + 健康检查 + 持久卷）、`app`、可选 `caddy`（`--profile https`，自动 HTTPS）。
+- `.github/workflows/docker.yml`：多架构镜像自动发布到 GHCR。
+
+**数据模型**（PRD 中的七张表）
+
+| 表 | 用途 |
+| --- | --- |
+| `users` | 账号、背景信息、套餐、AI 用量、日历订阅 token |
+| `companies` | 公司卡片：行业、渠道、当前阶段、状态、下一步与截止、备注 |
+| `stages` | 每家公司的选考流程，可增删排序，记录日期和结果 |
+| `tests` | 笔试记录：类型（固定枚举）、形式、受检期限、状态、AI 识别置信度 |
+| `events` | 日历与提醒的数据来源，可关联来源邮件 |
+| `emails` | 粘贴的邮件原文与 AI 解析结果、是否已确认 |
+| `es_docs` | ES 草稿、改写稿、完整点评（JSONB）、素材库标记 |
+
+```
+src/
+├── app/
+│   ├── (auth)/            登录 / 注册
+│   ├── (app)/             登录后的页面：dashboard, es, tracker, inbox, tests, settings
+│   ├── api/               JSON 接口
+│   ├── layout.tsx, page.tsx (落地页), globals.css (设计 token)
+├── components/            UI 组件（Button, Card, Badge…）、导航、日程列表
+├── lib/                   db / auth / data / llm / constants / time
+└── proxy.ts
+db/schema.sql              幂等建表脚本
+deploy/Caddyfile           HTTPS 反向代理
+```
+
+---
+
+## 本地开发
+
+需要 Node.js 20+ 和一个 PostgreSQL（可以只用 Docker 启动数据库）：
+
+```bash
+npm install
+docker compose up -d db                     # 只启动数据库
+cp .env.example .env.local
+# .env.local 中补充：
+#   DATABASE_URL=postgres://shukatsu:<POSTGRES_PASSWORD>@localhost:5432/shukatsu
+# 并在 docker-compose.yml 的 db 服务下临时加上 ports: ["5432:5432"]
+npm run dev                                  # http://localhost:3000
+```
+
+```bash
+npm run typecheck   # TypeScript 检查
+npm run build       # 生产构建
+```
+
+---
+
+## 配置项
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `AUTH_SECRET` | — | **必填**。签名登录会话的随机字符串（16 位以上） |
+| `POSTGRES_PASSWORD` | — | **必填**（docker compose）。数据库密码 |
+| `DATABASE_URL` | compose 自动生成 | 不用 compose 时手动设置 |
+| `LLM_PROVIDER` | `auto` | `auto` / `anthropic` / `openai` / `mock` |
+| `ANTHROPIC_API_KEY` | — | Claude API Key |
+| `ANTHROPIC_MODEL` | `claude-opus-5-5` | Claude 模型 |
+| `ANTHROPIC_FALLBACKS` | `default` | `off` 关闭服务端 refusal fallback |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` | — | OpenAI 兼容接口 |
+| `APP_PORT` | `3000` | 宿主机端口 |
+| `PUBLIC_URL` | `http://localhost:3000` | 网站公开地址（日历订阅链接、Cookie Secure 判断） |
+| `APP_TIMEZONE` | `Asia/Tokyo` | 解析邮件日期使用的时区 |
+| `ENFORCE_QUOTA` | `false` | `true` 时启用免费版额度 |
+| `FREE_ES_LIMIT` / `FREE_EMAIL_LIMIT` | `3` / `5` | 免费版 ES 添削 / 邮件识别次数 |
+| `DOMAIN` | — | `--profile https` 时 Caddy 使用的域名 |
+| `APP_IMAGE` | `shukatsu-buddy:latest` | 改为 GHCR 镜像即可免编译部署 |
+
+---
+
+## 与 PRD 的对应关系 & 路线图
+
+**首版已实现**
+
+- [x] 功能一：ES 添削（日文改写、字数控制、逐句中文说明、结构评分、素材库、留学生专项题目模板）
+- [x] 功能二：个人版选考追踪（公司卡片、可增删阶段流程、看板 + 日历、提醒、日文邮件识别、回信辅助、统计）
+- [x] 功能三：每家公司的笔试类型（类型/形式/期限、AI 识别 + 置信度、备考建议、按类型汇总）
+- [x] 七张表数据模型，按用户隔离，一键删除
+- [x] 移动端优先的 PWA
+- [x] 免费额度开关（对应 PRD 变现方案中的免费版）
+
+**实现上的取舍**
+
+- PRD 建议 Supabase；为了「一条命令自托管」，这里使用自带的 Postgres + 轻量认证，数据模型与 PRD 一致，之后迁移到 Supabase 也很直接。
+- 提醒先用**日历订阅（.ics + VALARM）**实现，无需推送服务器和额外权限，iOS / Android / Google 日历通用。
+
+**后续**
+
+- [ ] Stripe 订阅（月度 / 就活季票）
+- [ ] Web Push、LINE / 微信提醒
+- [ ] 公司信息 AI 摘要（官网采用页 + gBizINFO + EDINET）
+- [ ] 外国人录用友好度
+- [ ] 面试模拟（语音问答 + 中文反馈）
+- [ ] 自己分析助手（追问式挖掘经历，产出ガクチカ / 自己PR）
+- [ ] 匿名共享「某公司用了什么笔试」数据库
