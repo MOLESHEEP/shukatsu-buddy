@@ -56,7 +56,18 @@ export function AuthForm({ mode, signup }: { mode: "login" | "register"; signup?
             <Field label="邮箱">
               <Input name="email" type="email" required autoComplete="email" placeholder="you@example.com" />
             </Field>
-            <Field label="密码" hint={isLogin ? undefined : "至少 8 位"}>
+            <Field
+              label="密码"
+              hint={
+                isLogin ? (
+                  <Link href="/forgot-password" className="text-sakura-600 hover:underline">
+                    忘记密码？
+                  </Link>
+                ) : (
+                  "至少 8 位"
+                )
+              }
+            >
               <Input name="password" type="password" required minLength={isLogin ? 1 : 8} autoComplete={isLogin ? "current-password" : "new-password"} />
             </Field>
             {!isLogin && signup?.mode === "invite" && (

@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   // Produces a self-contained server in .next/standalone for small Docker images.
   output: "standalone",
   poweredByHeader: false,
-  serverExternalPackages: ["pg"],
+  serverExternalPackages: ["pg", "nodemailer"],
 };
 
 export default nextConfig;

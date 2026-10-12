@@ -14,7 +14,9 @@ function secretKey() {
 }
 
 export async function createSession(userId: number) {
-  const token = await new SignJWT({ uid: userId })
+  // The session carries the account's session_version; bumping it (password reset/change) invalidates older sessions.
+  const row = await queryOne<{ session_version: number }>(`SELECT session_version FROM users WHERE id = $1`, [userId]);
+  const token = await new SignJWT({ uid: userId, sv: row?.session_version ?? 0 })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DAYS}d`)
@@ -34,15 +36,20 @@ export async function destroySession() {
   (await cookies()).delete(SESSION_COOKIE);
 }
 
-export async function getUserId(): Promise<number | null> {
+async function readSession(): Promise<{ uid: number; sv: number } | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey());
-    return typeof payload.uid === "number" ? payload.uid : null;
+    return typeof payload.uid === "number" ? { uid: payload.uid, sv: typeof payload.sv === "number" ? payload.sv : 0 } : null;
   } catch {
     return null;
   }
+}
+
+/** Cheap check (no DB); use getUser() for anything that needs a valid, current session. */
+export async function getUserId(): Promise<number | null> {
+  return (await readSession())?.uid ?? null;
 }
 
 export type User = {
@@ -61,19 +68,21 @@ export type User = {
   status: "active" | "banned";
   /** NULL = follow the site-wide default set by the admin. */
   ai_enabled: boolean | null;
+  session_version: number;
 };
 
 /** The signed-in user. Banned accounts are treated as signed out. */
 export async function getUser(): Promise<User | null> {
-  const uid = await getUserId();
-  if (!uid) return null;
+  const session = await readSession();
+  if (!session) return null;
+  const uid = session.uid;
   const user = await queryOne<User>(
     `SELECT id, email, display_name, grad_year, major, jp_level, plan, es_used, email_used, ics_token, career_stage,
-            role, status, ai_enabled
+            role, status, ai_enabled, session_version
        FROM users WHERE id = $1`,
     [uid],
   );
-  if (!user || user.status !== "active") return null;
+  if (!user || user.status !== "active" || user.session_version !== session.sv) return null;
   // Cheap activity tracking for the admin overview (at most one write per 10 minutes).
   void query(`UPDATE users SET last_seen_at = now() WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '10 minutes')`, [
     uid,

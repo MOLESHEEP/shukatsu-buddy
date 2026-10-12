@@ -237,6 +237,28 @@ CREATE TABLE IF NOT EXISTS announcement_reads (
   PRIMARY KEY (announcement_id, user_id)
 );
 
+-- ---------- v0.8: 找回密码 ----------
+-- Bumped on password reset/change; sessions carrying an older version are rejected (logs out other devices).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INT NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash      TEXT PRIMARY KEY,                     -- sha256 of the token; the token itself is only in the link
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  origin          TEXT NOT NULL DEFAULT 'email',        -- email | admin
+  expires_at      TIMESTAMPTZ NOT NULL,
+  used_at         TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets(user_id, created_at DESC);
+
+-- Generic throttle log (forgot-password requests, failed logins). Keys are hashed; rows older than a day are pruned.
+CREATE TABLE IF NOT EXISTS auth_throttle (
+  kind            TEXT NOT NULL,                        -- forgot | login_fail
+  key             TEXT NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS auth_throttle_idx ON auth_throttle(kind, key, created_at);
+
 -- Posts: status may also be 'hidden' (by an admin).
 CREATE TABLE IF NOT EXISTS post_reports (
   id              BIGSERIAL PRIMARY KEY,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, ChevronDown, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
+import { Ban, Check, ChevronDown, Copy, KeyRound, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
 import { Badge, Button, EmptyState, Input, cx } from "@/components/ui";
 import { api, errMsg } from "@/lib/client";
 import type { AdminUserRow } from "@/lib/admin";
@@ -30,6 +30,8 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
     limit_email: u.limit_email?.toString() ?? "",
     limit_post: u.limit_post?.toString() ?? "",
   });
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const admin = u.role === "admin";
   const aiOn = admin || (u.ai_enabled ?? defaults.ai);
 
@@ -39,6 +41,19 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
     try {
       await api(`/api/admin/users/${u.id}`, { method: "PATCH", body });
       router.refresh();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function makeResetLink() {
+    if (!confirm(`为 ${u.email} 生成重置密码链接？链接 24 小时内有效、只能用一次，请通过可信的渠道发给本人。`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setResetLink((await api<{ link: string }>(`/api/admin/users/${u.id}/reset-link`, { method: "POST" })).link);
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -148,6 +163,11 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
             >
               保存额度
             </Button>
+            {(!admin || isMe) && u.status === "active" && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={makeResetLink} title="用户忘记密码时使用">
+                <KeyRound className="size-3.5" /> 重置密码链接
+              </Button>
+            )}
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => patch({ reset_today: true })} title="清零今天已用次数">
               <RotateCcw className="size-3.5" /> 重置今日次数
             </Button>
@@ -172,6 +192,25 @@ function UserRow({ u, isMe, defaults }: { u: AdminUserRow; isMe: boolean; defaul
                 )}
               </Button>
             )}
+          </div>
+        </div>
+      )}
+      {resetLink && (
+        <div className="mt-3 rounded-xl bg-lemon-50 px-3 py-2.5 text-xs text-lemon-700">
+          <p>把这个链接发给 {u.email}（24 小时内有效、只能用一次）。对方设置新密码后，其他设备上的登录会全部退出。</p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded bg-paper px-2 py-1 font-mono">{resetLink}</code>
+            <button
+              onClick={async () => {
+                await navigator.clipboard.writeText(resetLink);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="shrink-0 rounded-lg p-1.5 hover:bg-paper"
+              aria-label="复制"
+            >
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            </button>
           </div>
         </div>
       )}
