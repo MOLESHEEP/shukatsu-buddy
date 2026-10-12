@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getCompanyDetail } from "@/lib/data";
+import { postsForCompany } from "@/lib/posts";
 import { CompanyDetail } from "./detail";
 
 export default async function CompanyPage({ params }: { params: Promise<{ id: string }> }) {
@@ -9,5 +10,6 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
   if (!Number.isInteger(id)) notFound();
   const detail = await getCompanyDetail(user.id, id);
   if (!detail) notFound();
-  return <CompanyDetail {...detail} />;
+  const posts = await postsForCompany(user.id, detail.company.name);
+  return <CompanyDetail {...detail} posts={posts} />;
 }

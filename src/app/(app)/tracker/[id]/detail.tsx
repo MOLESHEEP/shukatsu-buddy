@@ -9,10 +9,19 @@ import { COMPANY_STATUS, EVENT_KINDS, STAGE_RESULTS, TEST_FORMATS, TEST_STATUS, 
 import { api, errMsg } from "@/lib/client";
 import { formatDateTime, isoToLocalInput } from "@/lib/time";
 import type { CalEvent, Company, Stage, Test } from "@/lib/data";
+import { POST_KINDS, type Post } from "@/lib/community";
+import { TimePill } from "@/components/post-view";
 
-type Props = { company: Company; stages: Stage[]; tests: Test[]; events: CalEvent[]; esDocs: { id: number; question: string; created_at: string }[] };
+type Props = {
+  company: Company;
+  stages: Stage[];
+  tests: Test[];
+  events: CalEvent[];
+  esDocs: { id: number; question: string; created_at: string }[];
+  posts: Post[];
+};
 
-export function CompanyDetail({ company, stages, tests, events, esDocs }: Props) {
+export function CompanyDetail({ company, stages, tests, events, esDocs, posts }: Props) {
   const router = useRouter();
   const status = COMPANY_STATUS[company.status];
 
@@ -59,6 +68,34 @@ export function CompanyDetail({ company, stages, tests, events, esDocs }: Props)
         <div className="space-y-6">
           <InfoCard company={company} />
           <TestsCard companyId={company.id} tests={tests} />
+          <Card>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">前辈经验</h2>
+              <Link href={`/community?q=${encodeURIComponent(company.name.replace(/株式会社|（株）/g, "").trim())}`} className="text-xs text-sakura-600 hover:underline">
+                查看全部
+              </Link>
+            </div>
+            {posts.length ? (
+              <ul className="mt-2 divide-y divide-line">
+                {posts.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/community/${p.id}`} className="block py-2.5 hover:text-sakura-600">
+                      <div className="text-sm font-medium">{p.title}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                        {POST_KINDS[p.kind].emoji} {POST_KINDS[p.kind].label}
+                        <TimePill post={p} />
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-muted">还没有人分享这家公司的经验。</p>
+            )}
+            <Link href={`/community/new?company=${encodeURIComponent(company.name)}`} className="mt-3 inline-block text-sm font-medium text-sakura-600 hover:underline">
+              ＋ 分享我在这里的经验
+            </Link>
+          </Card>
           {esDocs.length > 0 && (
             <Card>
               <h2 className="font-semibold">相关 ES</h2>

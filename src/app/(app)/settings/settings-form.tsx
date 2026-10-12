@@ -7,7 +7,7 @@ import { Button, Card, ErrorNote, Field, Input, Select } from "@/components/ui";
 import { api, errMsg } from "@/lib/client";
 
 type Props = {
-  user: { display_name: string; email: string; grad_year: number | null; major: string; jp_level: string; plan: string };
+  user: { display_name: string; email: string; grad_year: number | null; major: string; jp_level: string; plan: string; career_stage: string };
   icsUrl: string;
   provider: string;
   quota: { enforced: boolean; es: { used: number; limit: number }; email: { used: number; limit: number } };
@@ -15,7 +15,7 @@ type Props = {
 
 export function SettingsForm({ user, icsUrl, provider, quota }: Props) {
   const router = useRouter();
-  const [form, setForm] = useState({ display_name: user.display_name, grad_year: user.grad_year ? String(user.grad_year) : "", major: user.major, jp_level: user.jp_level });
+  const [form, setForm] = useState({ display_name: user.display_name, grad_year: user.grad_year ? String(user.grad_year) : "", major: user.major, jp_level: user.jp_level, career_stage: user.career_stage });
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export function SettingsForm({ user, icsUrl, provider, quota }: Props) {
     }
   }
   async function wipe(scope: "data" | "account") {
-    const msg = scope === "data" ? "删除全部公司、日程、邮件和 ES 记录？此操作不可恢复。" : "注销账号并删除所有数据？此操作不可恢复。";
+    const msg = scope === "data" ? "删除全部公司、日程、邮件、ES 记录和你发布的经验分享？此操作不可恢复。" : "注销账号并删除所有数据？此操作不可恢复。";
     if (!confirm(msg)) return;
     await api(`/api/me?scope=${scope}`, { method: "DELETE" });
     router.push(scope === "account" ? "/" : "/dashboard");
@@ -53,8 +53,25 @@ export function SettingsForm({ user, icsUrl, provider, quota }: Props) {
         <Field label="名字">
           <Input value={form.display_name} onChange={set("display_name")} />
         </Field>
+        <Field label="现在的身份">
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { k: "student", label: "🎓 学生 / 求职中" },
+              { k: "working", label: "💼 已经在日本工作" },
+            ].map((o) => (
+              <button
+                key={o.k}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, career_stage: o.k }))}
+                className={`rounded-xl border px-3 py-2.5 text-sm transition ${form.career_stage === o.k ? "border-sakura-300 bg-sakura-50 font-medium text-sakura-700" : "border-line text-muted hover:bg-stone-50"}`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="毕业年份">
+          <Field label={form.career_stage === "working" ? "毕业年份（几届）" : "毕业年份"}>
             <Input type="number" placeholder="2028" value={form.grad_year} onChange={set("grad_year")} />
           </Field>
           <Field label="日语水平">

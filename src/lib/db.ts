@@ -1,7 +1,10 @@
 import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, types, type QueryResultRow } from "pg";
+
+// BIGINT (ids, counts) as JS numbers instead of strings; our ids never approach 2^53.
+types.setTypeParser(types.builtins.INT8, (v) => Number(v));
 
 const globalForDb = globalThis as unknown as { pool?: Pool; schemaReady?: Promise<void> };
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardCheck, House, LogOut, Mail, PenLine, Settings, SquareKanban } from "lucide-react";
+import { ClipboardCheck, House, LogOut, Mail, PenLine, Settings, SquareKanban, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
   { href: "/tracker", label: "选考", icon: SquareKanban },
   { href: "/inbox", label: "邮件", icon: Mail },
   { href: "/tests", label: "笔试", icon: ClipboardCheck },
+  { href: "/community", label: "经验", icon: Users },
 ];
 
 export function SideNav({ name, provider }: { name: string; provider: string }) {
@@ -40,7 +41,7 @@ export function SideNav({ name, provider }: { name: string; provider: string }) 
               )}
             >
               <it.icon className="size-[18px]" />
-              {it.label === "选考" ? "选考追踪" : it.label === "邮件" ? "邮件助手" : it.label}
+              {({ 选考: "选考追踪", 邮件: "邮件助手", 经验: "经验分享" } as Record<string, string>)[it.label] ?? it.label}
             </Link>
           );
         })}
@@ -65,12 +66,12 @@ export function BottomNav() {
   const path = usePathname();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-6">
         {items.map((it) => {
           const active = path.startsWith(it.href);
           return (
             <Link key={it.href} href={it.href} className={cx("flex flex-col items-center gap-0.5 py-2 text-[11px]", active ? "text-sakura-600" : "text-muted")}>
-              <span className={cx("rounded-full px-3 py-1 transition", active && "bg-sakura-50")}>
+              <span className={cx("rounded-full px-2.5 py-1 transition", active && "bg-sakura-50")}>
                 <it.icon className="size-5" />
               </span>
               {it.label}

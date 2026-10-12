@@ -70,18 +70,21 @@ export function Button({ variant = "primary", loading, size = "md", className, c
 }
 
 const fieldBase =
-  "w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/60 transition focus:border-sakura-300 focus:outline-none focus:ring-4 focus:ring-sakura-50";
+  "rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/60 transition focus:border-sakura-300 focus:outline-none focus:ring-4 focus:ring-sakura-50";
+
+/** Full width unless the caller sets its own width (w-auto, w-64, …). */
+const field = (extra: string, className?: string) => cx(fieldBase, !/(^|\s)w-/.test(className ?? "") && "w-full", extra, className);
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cx(fieldBase, props.className)} />;
+  return <input {...props} className={field("", props.className)} />;
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cx(fieldBase, "leading-relaxed", props.className)} />;
+  return <textarea {...props} className={field("leading-relaxed", props.className)} />;
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cx(fieldBase, "appearance-auto pr-8", props.className)} />;
+  return <select {...props} className={field("appearance-auto pr-8", props.className)} />;
 }
 
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {

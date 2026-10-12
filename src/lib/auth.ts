@@ -56,13 +56,14 @@ export type User = {
   es_used: number;
   email_used: number;
   ics_token: string;
+  career_stage: "student" | "working";
 };
 
 export async function getUser(): Promise<User | null> {
   const uid = await getUserId();
   if (!uid) return null;
   return queryOne<User>(
-    `SELECT id, email, display_name, grad_year, major, jp_level, plan, es_used, email_used, ics_token
+    `SELECT id, email, display_name, grad_year, major, jp_level, plan, es_used, email_used, ics_token, career_stage
        FROM users WHERE id = $1`,
     [uid],
   );

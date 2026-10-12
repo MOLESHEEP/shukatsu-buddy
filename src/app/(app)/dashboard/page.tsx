@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, Mail, PenLine, Sparkles } from "lucide-react";
+import { ArrowRight, Building2, Mail, PenLine, Sparkles, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { stats, upcoming } from "@/lib/data";
 import { activeProvider } from "@/lib/llm/provider";
@@ -12,6 +12,7 @@ const quick = [
   { href: "/es", icon: PenLine, title: "添削一篇 ES", body: "贴上草稿，拿到地道日文", tone: "from-sakura-50 to-paper text-sakura-600" },
   { href: "/inbox", icon: Mail, title: "识别企业邮件", body: "自动提取日程和材料", tone: "from-mint-50 to-paper text-mint-700" },
   { href: "/tracker?new=1", icon: Building2, title: "添加公司", body: "开始追踪一家新公司", tone: "from-sky-50 to-paper text-sky-700" },
+  { href: "/community", icon: Users, title: "前辈经验", body: "面试经验与工作体验", tone: "from-violet-50 to-paper text-violet-700" },
 ];
 
 function greeting() {
@@ -50,7 +51,7 @@ export default async function Dashboard() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {quick.map((q, i) => (
           <Link
             key={q.href}

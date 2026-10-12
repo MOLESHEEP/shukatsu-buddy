@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "就活小助手 · 留学生就活助手", template: "%s · 就活小助手" },
-  description: "面向在日中国留学生的 AI 就活助手：中文操作、日文产出。ES添削、选考追踪、笔试准备。",
+  description: "面向在日中国留学生和在日工作者的 AI 就活助手：中文操作、日文产出。ES添削、选考追踪、笔试准备、经验分享。",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
   appleWebApp: { capable: true, title: "就活小助手", statusBarStyle: "default" },

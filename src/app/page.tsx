@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, CalendarDays, ClipboardCheck, Mail, PenLine } from "lucide-react";
+import { ArrowRight, CalendarDays, ClipboardCheck, Mail, PenLine, Users } from "lucide-react";
 import { getUserId } from "@/lib/auth";
 
 const features = [
@@ -8,6 +8,7 @@ const features = [
   { icon: CalendarDays, tone: "bg-sky-50 text-sky-600", title: "选考追踪", body: "看板 + 日历，几十家公司的截止日和面试一目了然，可订阅到手机日历提醒。" },
   { icon: Mail, tone: "bg-mint-50 text-mint-600", title: "日文邮件识别", body: "粘贴企业来信，自动提取日期、地点、所需材料，一键写入公司卡片，还能生成敬语回信。" },
   { icon: ClipboardCheck, tone: "bg-lemon-50 text-lemon-700", title: "笔试类型", body: "SPI、玉手箱、TG-WEB… 按公司记录笔试类型，告诉你该优先准备哪一种。" },
+  { icon: Users, tone: "bg-violet-50 text-violet-600", title: "经验分享", body: "前辈们的面试经验和入职后的真实工作体验，每篇都标注时间。随便说说，AI 帮你整理成文，确认后再发布。" },
 ];
 
 export default async function Landing() {
@@ -26,7 +27,7 @@ export default async function Landing() {
 
       <section className="animate-rise mt-14 text-center sm:mt-20">
         <span className="inline-block rounded-full bg-paper px-3 py-1 text-xs font-medium text-sakura-600 shadow-[var(--shadow-soft)]">
-          为 28 届在日中国留学生准备 🌸
+          给在日本求职、工作的中国人 🌸
         </span>
         <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
           中文思考，<span className="text-sakura-500">日文表达</span>
@@ -49,7 +50,7 @@ export default async function Landing() {
         </div>
       </section>
 
-      <section className="mt-16 grid gap-4 sm:mt-24 sm:grid-cols-2">
+      <section className="mt-16 grid gap-4 sm:mt-24 sm:grid-cols-2 lg:grid-cols-3">
         {features.map((f, i) => (
           <div
             key={f.title}

@@ -59,6 +59,17 @@ export const EmailParseSchema = z.object({
 });
 export type EmailParse = z.infer<typeof EmailParseSchema>;
 
+export const PostDraftSchema = z.object({
+  title: z.string().describe("一句话标题，30 字以内"),
+  sections: z
+    .array(z.object({ heading: z.string(), content: z.string() }))
+    .describe("按模板组织的小节；用户没提到的小节不要编造，直接省略"),
+  tags: z.array(z.string()).describe("3–6 个短标签"),
+  questions_zh: z.array(z.string()).describe("补充后会更有参考价值的信息，0–4 条，以提问形式"),
+  privacy_warnings_zh: z.array(z.string()).describe("可能暴露个人或公司机密的内容，0–3 条"),
+});
+export type PostDraft = z.infer<typeof PostDraftSchema>;
+
 export const ReplySchema = z.object({
   subject: z.string(),
   body: z.string(),

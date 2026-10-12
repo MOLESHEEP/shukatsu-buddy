@@ -1,6 +1,15 @@
 import "server-only";
 import { generate } from "./provider";
-import { EmailParseSchema, EsReviewSchema, ReplySchema, type EmailParse, type EsReview, type ReplyDraft } from "./schemas";
+import {
+  EmailParseSchema,
+  EsReviewSchema,
+  PostDraftSchema,
+  ReplySchema,
+  type EmailParse,
+  type EsReview,
+  type PostDraft,
+  type ReplyDraft,
+} from "./schemas";
 import { REPLY_SCENARIOS } from "../constants";
 import { todayLocal, APP_TZ } from "../time";
 
@@ -119,7 +128,80 @@ export async function draftReply(input: {
   });
 }
 
+// ---------------- 经验分享 ----------------
+
+const POST_SYSTEM = `你帮在日本求职、工作的中国人把自己的经历整理成一篇给后来者看的经验分享。
+用户只会粗略描述，你负责组织语言、分小节，让内容清楚、具体、好读。
+铁律：
+- 只使用用户提供的事实，绝不补充、推测或美化任何细节、数字、评价。用户没提到的小节直接省略。
+- 保持用户本人的观点和语气（第一人称），不要变成广告或客套话。
+- 用简体中文写；面试中被问到的问题、公司内部用语保留日文原文（如「ガクチカ」「逆質問」）。
+- 去掉或模糊化可识别个人的信息（面试官姓名、同事姓名、联系方式），以及明显属于公司机密的内容，并在 privacy_warnings_zh 中提醒。
+- 正文适合手机阅读：每小节 1–4 段或要点列表，要点用"- "开头。`;
+
+const POST_TEMPLATES: Record<"interview" | "work", string> = {
+  interview: "小节模板（按需选用）：选考流程概览 / 面试形式与氛围 / 被问到的问题 / 我的回答要点 / 结果与感想 / 给后来者的建议",
+  work: "小节模板（按需选用）：工作内容 / 团队与氛围 / 加班与工作生活平衡 / 薪资与福利（只写用户愿意公开的程度）/ 对外国人的友好度（签证、语言、晋升）/ 成长与职业发展 / 给想加入的人的建议",
+};
+
+export async function draftPost(input: {
+  kind: "interview" | "work";
+  company: string;
+  role?: string;
+  timeLabel: string;
+  extra?: string;
+  notes: string;
+}): Promise<PostDraft> {
+  const prompt = [
+    `【类型】${input.kind === "interview" ? "面试经验" : "工作体验"}`,
+    `【公司】${input.company}`,
+    input.role ? `【职种 / 岗位】${input.role}` : "",
+    `【时间】${input.timeLabel}`,
+    input.extra ? `【其他信息】${input.extra}` : "",
+    POST_TEMPLATES[input.kind],
+    `【用户的粗略描述】\n${input.notes}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return generate({
+    system: POST_SYSTEM,
+    prompt,
+    schema: PostDraftSchema,
+    effort: "medium",
+    mock: () => mockPost(input.kind, input.company, input.notes),
+  });
+}
+
 // ---------------- Demo-mode samples ----------------
+
+function mockPost(kind: "interview" | "work", company: string, notes: string): PostDraft {
+  const quote = notes.trim().slice(0, 80);
+  return kind === "interview"
+    ? {
+        title: `${company} 一次面试：重视逻辑和入社动机`,
+        sections: [
+          { heading: "选考流程概览", content: "ES → 适性检查 → 一次面试（线上）→ 二次面试 → 最终面试" },
+          { heading: "面试形式与氛围", content: `【演示模式】线上 30 分钟，面试官 1 人，氛围比较轻松。\n你的描述：「${quote}」` },
+          { heading: "被问到的问题", content: "- 自己紹介を1分でお願いします\n- なぜ日本で働きたいのですか\n- ガクチカで一番苦労したことは\n- 逆質問" },
+          { heading: "给后来者的建议", content: "- 准备好「为什么是日本、为什么是这家公司」的一贯逻辑\n- 逆質問准备 2–3 个与业务相关的问题" },
+        ],
+        tags: ["线上面试", "一次面试", "留学生"],
+        questions_zh: ["面试大约多长时间？", "有没有被追问的问题？", "结果是多久后通知的？"],
+        privacy_warnings_zh: ["【演示模式】配置 API Key 后，AI 会根据你的描述真实整理并检查隐私信息"],
+      }
+    : {
+        title: `在 ${company} 工作一年：节奏快但成长多`,
+        sections: [
+          { heading: "工作内容", content: `【演示模式】你的描述：「${quote}」` },
+          { heading: "团队与氛围", content: "- 团队 8 人左右，前辈愿意教\n- 会议以日语为主" },
+          { heading: "加班与工作生活平衡", content: "旺季月加班 30 小时左右，平时可以准时下班。" },
+          { heading: "对外国人的友好度", content: "- 公司协助办理签证更新\n- 有外籍员工晋升到管理层的例子" },
+        ],
+        tags: ["IT", "新卒入社", "外国人友好"],
+        questions_zh: ["入社后有哪些培训？", "日语水平对工作的影响大吗？"],
+        privacy_warnings_zh: ["【演示模式】配置 API Key 后，AI 会根据你的描述真实整理并检查隐私信息"],
+      };
+}
 
 function mockEsReview(question: string, draft: string, limit: number | null): EsReview {
   const base =

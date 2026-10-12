@@ -91,3 +91,45 @@ CREATE TABLE IF NOT EXISTS es_docs (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS es_docs_user_idx ON es_docs(user_id);
+
+-- ---------- v0.2: 经验分享社区 ----------
+
+-- Users are not only 新卒 job seekers: working members share 工作体验 too.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS career_stage TEXT NOT NULL DEFAULT 'student';   -- student | working
+
+CREATE TABLE IF NOT EXISTS posts (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL,                        -- interview | work
+  status          TEXT NOT NULL DEFAULT 'draft',        -- draft | published
+  company_name    TEXT NOT NULL,
+  industry        TEXT NOT NULL DEFAULT '',
+  role            TEXT NOT NULL DEFAULT '',             -- 职种 / 岗位
+  -- Time labels (required so readers know how current the experience is)
+  occurred_on     DATE NOT NULL,                        -- interview month, or work start month
+  ended_on        DATE,                                 -- work end month; NULL = 至今
+  grad_year       INT,                                  -- 届 of the author at the time (interview)
+  -- Interview-specific
+  stage           TEXT NOT NULL DEFAULT '',             -- 一次面试 / 最终面试 / 笔试 …
+  result          TEXT NOT NULL DEFAULT 'unknown',      -- passed | failed | pending | unknown
+  -- Work-specific
+  employment_type TEXT NOT NULL DEFAULT '',             -- 新卒 / 中途 / 实习 / 派遣 / アルバイト
+  rating          INT,                                  -- 1–5 overall (work)
+  title           TEXT NOT NULL,
+  body            TEXT NOT NULL,                        -- "## 小标题" sections + paragraphs
+  tags            TEXT[] NOT NULL DEFAULT '{}',
+  anonymous       BOOLEAN NOT NULL DEFAULT true,
+  notes           TEXT NOT NULL DEFAULT '',             -- the author's rough description; never shown publicly
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  published_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS posts_feed_idx ON posts(status, occurred_on DESC);
+CREATE INDEX IF NOT EXISTS posts_user_idx ON posts(user_id);
+
+CREATE TABLE IF NOT EXISTS post_votes (
+  post_id         BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, user_id)
+);

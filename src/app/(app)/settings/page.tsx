@@ -13,7 +13,7 @@ export default async function SettingsPage() {
     <>
       <PageHeader emoji="⚙️" title="设置" />
       <SettingsForm
-        user={{ display_name: user.display_name, email: user.email, grad_year: user.grad_year, major: user.major, jp_level: user.jp_level, plan: user.plan }}
+        user={{ display_name: user.display_name, email: user.email, grad_year: user.grad_year, major: user.major, jp_level: user.jp_level, plan: user.plan, career_stage: user.career_stage }}
         icsUrl={`${base}/api/ics/${user.ics_token}.ics`}
         provider={providerLabel()}
         quota={quotaInfo(user)}

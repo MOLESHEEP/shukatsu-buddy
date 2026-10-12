@@ -6,9 +6,11 @@ import { destroySession } from "@/lib/auth";
 
 const Patch = z.object({
   display_name: z.string().trim().max(40).optional(),
-  grad_year: z.number().int().min(2020).max(2040).nullable().optional(),
+  // Any cohort: current students, future 届, and members who graduated years ago.
+  grad_year: z.number().int().min(1980).max(2100).nullable().optional(),
   major: z.string().max(60).optional(),
   jp_level: z.string().max(40).optional(),
+  career_stage: z.enum(["student", "working"]).optional(),
   rotate_ics: z.boolean().optional(),
 });
 
@@ -16,7 +18,8 @@ export const PATCH = withUser(async (req, user) => {
   const b = await readJson(req, Patch);
   await query(
     `UPDATE users SET display_name = COALESCE($2, display_name), grad_year = CASE WHEN $3::boolean THEN $4::int ELSE grad_year END,
-            major = COALESCE($5, major), jp_level = COALESCE($6, jp_level), ics_token = COALESCE($7, ics_token)
+            major = COALESCE($5, major), jp_level = COALESCE($6, jp_level), ics_token = COALESCE($7, ics_token),
+            career_stage = COALESCE($8, career_stage)
       WHERE id = $1`,
     [
       user.id,
@@ -26,6 +29,7 @@ export const PATCH = withUser(async (req, user) => {
       b.major ?? null,
       b.jp_level ?? null,
       b.rotate_ics ? randomBytes(24).toString("base64url") : null,
+      b.career_stage ?? null,
     ],
   );
   return { ok: true };
@@ -41,6 +45,8 @@ export const DELETE = withUser(async (req, user) => {
     await query(`DELETE FROM companies WHERE user_id = $1`, [user.id]);
     await query(`DELETE FROM emails WHERE user_id = $1`, [user.id]);
     await query(`DELETE FROM es_docs WHERE user_id = $1`, [user.id]);
+    await query(`DELETE FROM posts WHERE user_id = $1`, [user.id]);
+    await query(`DELETE FROM post_votes WHERE user_id = $1`, [user.id]);
   }
   return { ok: true };
 });
