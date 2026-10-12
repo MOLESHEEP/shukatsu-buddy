@@ -68,7 +68,7 @@ cd shukatsu-buddy
 cp .env.example .env
 # 编辑 .env：至少修改 AUTH_SECRET 和 POSTGRES_PASSWORD
 #   AUTH_SECRET 可以用：openssl rand -base64 32
-# 想用真实 AI：填 ANTHROPIC_API_KEY（或 OpenAI 兼容的 Key）
+# 想用真实 AI：填任意一家的 Key（Claude / ChatGPT / DeepSeek / Kimi / 千问 / GLM / Gemini / 豆包…）
 
 docker compose up -d --build
 ```
@@ -143,33 +143,54 @@ docker compose exec -T db psql -U shukatsu shukatsu < backup.sql          # 恢�
 
 ## 接入大模型
 
-所有 AI 调用集中在 `src/lib/llm/`，通过 `LLM_PROVIDER` 选择后端：
+支持主流的国内外大模型，**在 `.env` 里填任意一家的 API Key 即可**，不需要改代码。
 
-| `LLM_PROVIDER` | 说明 | 需要的变量 |
-| --- | --- | --- |
-| `auto`（默认） | 有 `ANTHROPIC_API_KEY` 用 Claude；否则有 `OPENAI_API_KEY` 用 OpenAI 兼容接口；都没有则进入演示模式 | — |
-| `anthropic` | **推荐**。使用 Anthropic 官方 SDK + 结构化输出（JSON Schema 约束），返回格式有保证 | `ANTHROPIC_API_KEY`，可选 `ANTHROPIC_MODEL`（默认 `claude-opus-5-5`） |
-| `openai` | 任意 OpenAI 兼容接口：DeepSeek、通义千问（DashScope）、Moonshot、智谱、Ollama、vLLM… 使用 JSON mode + Zod 校验，失败自动重试一次 | `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL` |
-| `mock` | 演示模式，返回固定示例 | — |
+| ID（`LLM_PROVIDER`） | 服务 | API Key 变量（任填其一） | 默认模型 | JSON 输出方式 |
+| --- | --- | --- | --- | --- |
+| `anthropic` | **Claude**（Anthropic） | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | 官方 SDK 结构化输出 |
+| `openai` | **ChatGPT**（OpenAI） | `OPENAI_API_KEY` | `gpt-6.1-sol` | `json_schema` |
+| `deepseek` | **DeepSeek** 深度求索 | `DEEPSEEK_API_KEY` | `deepseek-flash` | `json_object` |
+| `kimi` | **Kimi**（Moonshot 月之暗面） | `KIMI_API_KEY` / `MOONSHOT_API_KEY` | `kimi-k3` | `json_object` |
+| `qwen` | **通义千问 Qwen**（阿里云百炼） | `QWEN_API_KEY` / `DASHSCOPE_API_KEY` | `qwen-plus` | `json_object` |
+| `glm` | **智谱 GLM** | `GLM_API_KEY` / `ZHIPU_API_KEY` | `glm-5.3` | `json_object` |
+| `gemini` | **Gemini**（Google） | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `gemini-3.8-flash` | `json_schema` |
+| `doubao` | **豆包 Doubao**（火山方舟） | `DOUBAO_API_KEY` / `ARK_API_KEY` | 需设置 `DOUBAO_MODEL` | `json_object` |
+| `ollama` | **Ollama** 本地模型 | 无需 | 需设置 `OLLAMA_MODEL` | `json_object` |
+| `custom` | 任意 OpenAI 兼容服务（OpenRouter、SiliconFlow、vLLM、LM Studio…） | `CUSTOM_API_KEY`（可选） | 需设置 `CUSTOM_MODEL` | 可配置 |
+
+- 每家都能用 `<ID>_MODEL` 换模型、`<ID>_BASE_URL` 换地址（如 Kimi 国内账号用 `KIMI_BASE_URL=https://api.moonshot.cn/v1`，千问海外地域用控制台给出的地址）、`<ID>_JSON_MODE` 覆盖 JSON 方式。
+- `LLM_PROVIDER=auto`（默认）会按上表顺序选第一个配置好的；也可以直接指定，例如 `LLM_PROVIDER=deepseek`。
+- **备用链**：`LLM_FALLBACK=kimi,qwen` —— 主力超时、5xx 或限流时自动换下一家，用户无感知。
+- **模型名会过时**：各家改名很频繁（默认值核对于 2026 年 10 月）。部署后到「设置 → AI 引擎」，点「测试」验证 Key / 模型 / JSON 输出，点列表按钮查看这个 Key 当前可用的全部模型，再把想用的写进 `<ID>_MODEL`。
+- 设置页只显示服务名、模型和状态，**API Key 永远不会发送到浏览器**。
 
 示例：
 
 ```bash
-# Claude（推荐）
+# 只用 Claude
 ANTHROPIC_API_KEY=sk-ant-...
 
-# DeepSeek
-LLM_PROVIDER=openai
-OPENAI_BASE_URL=https://api.deepseek.com/v1
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=deepseek-chat
+# DeepSeek 为主，Kimi 和千问做备用
+LLM_PROVIDER=deepseek
+LLM_FALLBACK=kimi,qwen
+DEEPSEEK_API_KEY=sk-...
+KIMI_API_KEY=sk-...
+QWEN_API_KEY=sk-...
 
-# 本地 Ollama（容器内访问宿主机）
-LLM_PROVIDER=openai
-OPENAI_BASE_URL=http://host.docker.internal:11434/v1
-OPENAI_API_KEY=ollama
-OPENAI_MODEL=qwen2.5:14b
+# 本地 Ollama（模型跑在宿主机上）
+OLLAMA_MODEL=qwen3:14b
+
+# OpenRouter 等聚合服务
+CUSTOM_BASE_URL=https://openrouter.ai/api/v1
+CUSTOM_API_KEY=sk-or-...
+CUSTOM_MODEL=anthropic/claude-sonnet-5.5
 ```
+
+**OpenAI 兼容服务的调用细节**（`src/lib/llm/provider.ts`）
+
+- 能用 `json_schema` 的服务直接传 schema；只支持 `json_object` 的服务在提示词里附上 JSON Schema；返回结果一律经 Zod 校验，不合格自动带着错误原因重试一次。
+- 自动去掉推理模型的 `<think>…</think>`、Markdown 代码块和多余文字。
+- 401 / 404（模型不存在）/ 402（余额不足）/ 429 / 5xx / 超时都给出具体的中文提示。
 
 **Claude 调用细节**
 
@@ -251,7 +272,8 @@ Next.js 16 App Router ───────────────────�
    ├── src/lib/db.ts      pg 连接池 + 自动建表 (db/schema.sql)
    ├── src/lib/auth.ts    bcrypt 密码 + JWT(HS256) httpOnly Cookie
    ├── src/lib/data.ts    数据访问（全部按 user_id 隔离）
-   └── src/lib/llm/       provider.ts  Claude / OpenAI 兼容 / 演示
+   └── src/lib/llm/       providers.ts 10 种 AI 服务的注册表（地址 / 默认模型 / Key 变量 / JSON 方式）
+                          provider.ts  调用层：Claude SDK、OpenAI 兼容协议、备用链、演示模式、连接测试
                           schemas.ts   Zod 结构化输出定义
                           tasks.ts     提示词：ES 添削 / 邮件解析 / 回信 / 经验整理
    ├── src/lib/posts.ts   经验分享查询（公开内容不含作者原始描述）
@@ -326,11 +348,10 @@ npm run build       # 生产构建
 | `AUTH_SECRET` | — | **必填**。签名登录会话的随机字符串（16 位以上） |
 | `POSTGRES_PASSWORD` | — | **必填**（docker compose）。数据库密码 |
 | `DATABASE_URL` | compose 自动生成 | 不用 compose 时手动设置 |
-| `LLM_PROVIDER` | `auto` | `auto` / `anthropic` / `openai` / `mock` |
-| `ANTHROPIC_API_KEY` | — | Claude API Key |
-| `ANTHROPIC_MODEL` | `claude-opus-5-5` | Claude 模型 |
-| `ANTHROPIC_FALLBACKS` | `default` | `off` 关闭服务端 refusal fallback |
-| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` | — | OpenAI 兼容接口 |
+| `LLM_PROVIDER` | `auto` | `auto` / `anthropic` / `openai` / `deepseek` / `kimi` / `qwen` / `glm` / `gemini` / `doubao` / `ollama` / `custom` / `mock` |
+| `LLM_FALLBACK` | — | 备用服务，逗号分隔，如 `deepseek,kimi` |
+| `<ID>_API_KEY` / `<ID>_MODEL` / `<ID>_BASE_URL` / `<ID>_JSON_MODE` | 见上表 | 每家服务的 Key、模型、地址、JSON 方式（ID 为大写，如 `DEEPSEEK_MODEL`） |
+| `ANTHROPIC_FALLBACKS` | `default` | `off` 关闭 Claude 服务端 refusal fallback |
 | `APP_PORT` | `3000` | 宿主机端口 |
 | `PUBLIC_URL` | `http://localhost:3000` | 网站公开地址（日历订阅链接、Cookie Secure 判断） |
 | `APP_TIMEZONE` | `Asia/Tokyo` | 解析邮件日期使用的时区 |

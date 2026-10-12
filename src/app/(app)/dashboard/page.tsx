@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Building2, Mail, PenLine, Sparkles, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { stats, upcoming } from "@/lib/data";
-import { activeProvider } from "@/lib/llm/provider";
+import { isDemoMode } from "@/lib/llm/provider";
 import { Card, EmptyState } from "@/components/ui";
 import { UpcomingList } from "@/components/upcoming-list";
 
@@ -42,11 +42,11 @@ export default async function Dashboard() {
         </p>
       </div>
 
-      {activeProvider() === "mock" && (
+      {isDemoMode() && (
         <div className="flex items-start gap-3 rounded-2xl bg-violet-50 px-4 py-3 text-sm text-violet-700">
           <Sparkles className="mt-0.5 size-4 shrink-0" />
           <p>
-            当前是<b>演示模式</b>：AI 功能返回示例结果。在 <code className="rounded bg-paper/70 px-1">.env</code> 中填写 <code className="rounded bg-paper/70 px-1">ANTHROPIC_API_KEY</code>（或任意 OpenAI 兼容 API）后重启即可使用真实 AI。
+            当前是<b>演示模式</b>：AI 功能返回示例结果。在 <code className="rounded bg-paper/70 px-1">.env</code> 中填写任意一家的 API Key（Claude、ChatGPT、DeepSeek、Kimi、通义千问、智谱 GLM、Gemini、豆包…）后重启即可使用真实 AI。
           </p>
         </div>
       )}

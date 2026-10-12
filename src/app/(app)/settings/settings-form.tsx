@@ -9,11 +9,11 @@ import { api, errMsg } from "@/lib/client";
 type Props = {
   user: { display_name: string; email: string; grad_year: number | null; major: string; jp_level: string; plan: string; career_stage: string };
   icsUrl: string;
-  provider: string;
+  aiPanel: React.ReactNode;
   quota: { enforced: boolean; es: { used: number; limit: number }; email: { used: number; limit: number } };
 };
 
-export function SettingsForm({ user, icsUrl, provider, quota }: Props) {
+export function SettingsForm({ user, icsUrl, aiPanel, quota }: Props) {
   const router = useRouter();
   const [form, setForm] = useState({ display_name: user.display_name, grad_year: user.grad_year ? String(user.grad_year) : "", major: user.major, jp_level: user.jp_level, career_stage: user.career_stage });
   const [saved, setSaved] = useState(false);
@@ -122,12 +122,10 @@ export function SettingsForm({ user, icsUrl, provider, quota }: Props) {
           </button>
         </Card>
 
+        {aiPanel}
+
         <Card className="space-y-2">
-          <h2 className="font-semibold">AI 与额度</h2>
-          <p className="text-sm">
-            <span className="text-muted">当前引擎：</span>
-            {provider}
-          </p>
+          <h2 className="font-semibold">AI 使用量</h2>
           <p className="text-sm">
             <span className="text-muted">已使用：</span>ES 添削 {quota.es.used} 次 · 邮件识别 {quota.email.used} 次
             {quota.enforced && <span className="text-muted">（免费版上限 {quota.es.limit} / {quota.email.limit}）</span>}

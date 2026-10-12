@@ -26,6 +26,9 @@ services:
       DATABASE_URL: postgres://shukatsu:${POSTGRES_PASSWORD}@db:5432/shukatsu
     ports:
       - "${APP_PORT:-3000}:3000"
+    # Lets OLLAMA_BASE_URL / CUSTOM_BASE_URL reach services on the host via host.docker.internal (Linux too).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
