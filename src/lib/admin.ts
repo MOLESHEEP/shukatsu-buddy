@@ -20,6 +20,8 @@ export async function overview() {
         (SELECT count(*) FROM posts WHERE status = 'published')::int AS posts_published,
         (SELECT count(*) FROM posts WHERE status = 'hidden')::int AS posts_hidden,
         (SELECT count(*) FROM post_reports WHERE status = 'open')::int AS reports_open,
+        (SELECT count(*) FROM posts WHERE status = 'pending')::int AS posts_pending,
+        (SELECT COALESCE(sum(points), 0) FROM users)::int AS points_outstanding,
         (SELECT count(*) FROM feedback WHERE status = 'new')::int AS feedback_new,
         (SELECT count(*) FROM feedback WHERE status IN ('doing', 'accepted'))::int AS feedback_open,
         (SELECT count(*) FROM companies)::int AS companies,
@@ -64,6 +66,7 @@ export type AdminUserRow = {
   today_post: number;
   total_ai: number;
   posts: number;
+  points: number;
   role_granted_at: string | null;
   granted_by_email: string | null;
   /** Defined in .env: admin rights can't be changed from the web. */
@@ -90,7 +93,7 @@ export async function listUsers(q: string, filter: string) {
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok AND a.task IN ('email', 'reply') AND a.created_at >= ${since})::int AS today_email,
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok AND a.task = 'post' AND a.created_at >= ${since})::int AS today_post,
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok)::int AS total_ai,
-            (SELECT count(*) FROM posts p WHERE p.user_id = u.id)::int AS posts,
+            (SELECT count(*) FROM posts p WHERE p.user_id = u.id)::int AS posts, u.points,
             u.role_granted_at, (SELECT g.email FROM users g WHERE g.id = u.role_granted_by) AS granted_by_email
        FROM users u
       ${where.length ? "WHERE " + where.join(" AND ") : ""}

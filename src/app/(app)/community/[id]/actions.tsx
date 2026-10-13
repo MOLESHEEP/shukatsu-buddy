@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Flag, Heart, PenLine, ShieldCheck, Trash2 } from "lucide-react";
+import { Check, Eye, EyeOff, Flag, Heart, PenLine, ShieldCheck, Trash2, X } from "lucide-react";
 import { Button, Card, Textarea, cx } from "@/components/ui";
 import { api, errMsg } from "@/lib/client";
 import { REPORT_REASONS } from "@/lib/community";
@@ -96,6 +96,18 @@ export function AdminPostActions({ id, status }: { id: number; status: string })
     router.refresh();
     setBusy(false);
   }
+  async function review(action: "approve" | "reject") {
+    const note = action === "reject" ? prompt("驳回原因（会通知作者）", "不符合社区规则") : "";
+    if (note === null) return;
+    setBusy(true);
+    try {
+      await api(`/api/admin/review/${id}`, { method: "PATCH", body: { action, note } });
+    } catch (e) {
+      alert(errMsg(e));
+    }
+    router.refresh();
+    setBusy(false);
+  }
   async function remove() {
     if (!confirm("以管理员身份永久删除这篇分享？")) return;
     setBusy(true);
@@ -109,6 +121,16 @@ export function AdminPostActions({ id, status }: { id: number; status: string })
         <ShieldCheck className="size-4" /> 管理员操作
       </span>
       <div className="flex flex-wrap gap-2">
+        {(status === "pending" || status === "rejected") && (
+          <Button size="sm" variant="soft" onClick={() => review("approve")} disabled={busy}>
+            <Check className="size-4" /> 审核通过
+          </Button>
+        )}
+        {status === "pending" && (
+          <Button size="sm" variant="ghost" onClick={() => review("reject")} disabled={busy}>
+            <X className="size-4" /> 驳回
+          </Button>
+        )}
         {status === "hidden" ? (
           <Button size="sm" variant="soft" onClick={() => setStatus("published")} disabled={busy}>
             <Eye className="size-4" /> 恢复显示
@@ -130,7 +152,7 @@ export function OwnerActions({ id, status }: { id: number; status: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   async function unpublish() {
-    if (!confirm("撤回后其他用户将看不到这篇分享，可以修改后重新发布。")) return;
+    if (!confirm(status === "pending" ? "撤回审核申请？分享会回到草稿状态。" : "撤回后其他用户将看不到这篇分享，可以修改后重新发布（需要重新审核）。")) return;
     setBusy(true);
     await api(`/api/posts/${id}`, { method: "PATCH", body: { action: "unpublish" } });
     router.refresh();
@@ -148,9 +170,9 @@ export function OwnerActions({ id, status }: { id: number; status: string }) {
       <span className="text-sm text-muted">这是你的分享</span>
       <div className="flex flex-wrap gap-2">
         <Link href={`/community/${id}/edit`} className="inline-flex items-center gap-1.5 rounded-full bg-sakura-50 px-4 py-1.5 text-sm font-medium text-sakura-700 hover:bg-sakura-100">
-          <PenLine className="size-4" /> {status === "draft" ? "继续编辑并发布" : "编辑"}
+          <PenLine className="size-4" /> {status === "draft" ? "继续编辑并发布" : status === "rejected" ? "修改后重新提交" : "编辑"}
         </Link>
-        {status === "published" && (
+        {(status === "published" || status === "pending") && (
           <Button size="sm" variant="ghost" onClick={unpublish} disabled={busy}>
             <EyeOff className="size-4" /> 撤回
           </Button>

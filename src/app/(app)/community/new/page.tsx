@@ -9,7 +9,7 @@ export const metadata = { title: "分享经验" };
 export default async function NewPostPage({ searchParams }: { searchParams: Promise<{ kind?: string; company?: string }> }) {
   const user = await requireUser();
   const [access, quota] = await Promise.all([aiAccess(user), quotaStatus(user)]);
-  const ai = { allowed: access.allowed, left: quota.unlimited ? null : Math.max(0, quota.limit.post - quota.used.post), userId: user.id };
+  const ai = { allowed: access.allowed, left: quota.unlimited ? null : Math.max(0, quota.limit.post - quota.used.post), points: quota.autoPoints ? quota.points : 0, userId: user.id };
   const sp = await searchParams;
   const kind = sp.kind === "work" || (!sp.kind && user.career_stage === "working") ? "work" : "interview";
   const thisMonth = new Date().toISOString().slice(0, 7);

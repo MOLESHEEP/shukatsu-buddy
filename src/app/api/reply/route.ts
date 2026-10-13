@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readJson, withUser } from "@/lib/api";
 import { draftReply } from "@/lib/llm/tasks";
 import { REPLY_SCENARIOS } from "@/lib/constants";
-import { checkQuota } from "@/lib/quota";
+import { withQuota } from "@/lib/quota";
 import { requireAi } from "@/lib/ai-access";
 
 export const maxDuration = 90;
@@ -20,7 +20,6 @@ const Body = z.object({
 /** Reply drafts share the 邮件助手 daily limit with email parsing. */
 export const POST = withUser(async (req, user) => {
   await requireAi(user);
-  await checkQuota(user, "email");
   const b = await readJson(req, Body);
-  return draftReply({ ...b, name: b.name || user.display_name }, user.id);
+  return withQuota(user, "email", () => draftReply({ ...b, name: b.name || user.display_name }, user.id));
 });

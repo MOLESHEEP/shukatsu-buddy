@@ -70,6 +70,15 @@ export const PostDraftSchema = z.object({
 });
 export type PostDraft = z.infer<typeof PostDraftSchema>;
 
+export const POST_VIOLATIONS = ["not_experience", "political", "sexual", "violence", "marketing", "defamation", "personal_attack", "privacy"] as const;
+
+export const PostReviewSchema = z.object({
+  decision: z.enum(["approve", "reject", "unsure"]).describe("approve = 可以发布；reject = 明确违反规则；unsure = 拿不准，交给人工"),
+  violations: z.array(z.enum(POST_VIOLATIONS)).describe("命中的规则，没有则为空数组"),
+  reason_zh: z.string().describe("给作者看的一两句中文说明：驳回时说明哪里有问题、怎么改；通过时简短说明即可"),
+});
+export type PostReview = z.infer<typeof PostReviewSchema>;
+
 export const ImportExtractSchema = z.object({
   posts: z.array(
     z.object({

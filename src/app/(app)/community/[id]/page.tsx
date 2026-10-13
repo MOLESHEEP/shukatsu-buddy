@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, TriangleAlert } from "lucide-react";
+import { ChevronLeft, Hourglass, TriangleAlert } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getPost } from "@/lib/posts";
 import { staleness } from "@/lib/community";
@@ -8,7 +8,14 @@ import { Badge, Card } from "@/components/ui";
 import { PostBody, PostMeta, authorLabel } from "@/components/post-view";
 import { AdminPostActions, OwnerActions, ReportButton, VoteButton } from "./actions";
 
-export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
+const REVIEW_TOAST: Record<string, { tone: string; text: string }> = {
+  awarded: { tone: "bg-mint-50 text-mint-700", text: "🎉 已通过审核并公开，获得 1 point！可以在「积分」页查看和使用。" },
+  capped: { tone: "bg-mint-50 text-mint-700", text: "✅ 已通过审核并公开。今天获得的 point 已达上限，这篇不再计分。" },
+  approved: { tone: "bg-mint-50 text-mint-700", text: "✅ 已通过审核并公开。" },
+};
+
+export default async function PostPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string }> }) {
+  const sp = await searchParams;
   const user = await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
@@ -25,6 +32,22 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       </Link>
 
       <Card className="p-6 sm:p-8">
+        {mine && post.status === "published" && sp.review && REVIEW_TOAST[sp.review] && (
+          <p className={`mb-4 rounded-xl px-3.5 py-2.5 text-sm ${REVIEW_TOAST[sp.review].tone}`}>{REVIEW_TOAST[sp.review].text}</p>
+        )}
+        {post.status === "pending" && (
+          <p className="mb-4 flex items-center gap-2 rounded-xl bg-sky-50 px-3.5 py-2.5 text-sm text-sky-700">
+            <Hourglass className="size-4 shrink-0" />
+            {mine ? "审核中：管理员审核通过后会公开，并获得 1 point。结果会通过「通知」告诉你。" : "这篇分享正在等待审核（仅管理员和作者可见）。"}
+          </p>
+        )}
+        {post.status === "rejected" && (
+          <div className="mb-4 rounded-xl bg-sakura-50 px-3.5 py-2.5 text-sm text-sakura-700">
+            <p className="font-medium">{mine ? "未通过审核，其他用户看不到这篇分享" : "这篇分享未通过审核（仅管理员和作者可见）"}</p>
+            {post.review_note && <p className="mt-1">原因：{post.review_note}</p>}
+            {mine && <p className="mt-1 text-xs opacity-80">修改后可以重新提交审核；如果你认为判断有误，可以去「意见反馈」联系管理员。</p>}
+          </div>
+        )}
         {post.status === "draft" && (
           <Badge tone="lemon" className="mb-3">
             草稿 · 仅自己可见

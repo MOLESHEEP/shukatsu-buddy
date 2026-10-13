@@ -22,6 +22,26 @@ export const REPORT_REASONS: Record<string, string> = {
   other: "其他",
 };
 
+/** Labels for the review rules (codes come from the AI reviewer, see POST_VIOLATIONS). */
+export const VIOLATION_LABELS: Record<string, string> = {
+  not_experience: "不是有效经验",
+  political: "反动 / 政治煽动",
+  sexual: "色情",
+  violence: "暴力",
+  marketing: "营销引流",
+  defamation: "诋毁",
+  personal_attack: "人身攻击",
+  privacy: "泄露隐私",
+};
+
+export const POST_STATUS: Record<string, { label: string; tone: string }> = {
+  draft: { label: "草稿", tone: "lemon" },
+  pending: { label: "审核中", tone: "sky" },
+  published: { label: "已发布", tone: "mint" },
+  rejected: { label: "未通过审核", tone: "rose" },
+  hidden: { label: "已隐藏", tone: "stone" },
+};
+
 export const INTERVIEW_STAGES = ["说明会 / 座谈会", "GD（小组讨论）", "笔试", "一次面试", "二次面试", "三次面试", "最终面试", "实习选考", "全流程"] as const;
 export const EMPLOYMENT_TYPES = ["新卒", "中途（转职）", "实习 / インターン", "派遣・契約", "アルバイト"] as const;
 
@@ -29,7 +49,7 @@ export type Post = {
   id: number;
   user_id: number;
   kind: PostKind;
-  status: "draft" | "published" | "hidden";
+  status: "draft" | "pending" | "published" | "rejected" | "hidden";
   company_name: string;
   industry: string;
   role: string;
@@ -49,6 +69,10 @@ export type Post = {
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  /** '' | awarded | capped */
+  reward: string;
+  /** Review result, only filled for the author's own posts. */
+  review_note: string;
   author: string;
   votes: number;
   voted: boolean;

@@ -36,7 +36,7 @@ export function EsWorkbench({
   initialCompanyId: number | null;
   initialDocId: number | null;
   /** left = remaining AI reviews today (null = unlimited) */
-  ai: { allowed: boolean; left: number | null; userId: number };
+  ai: { allowed: boolean; left: number | null; points: number; userId: number };
 }) {
   const router = useRouter();
   const initialDoc = docs.find((d) => d.id === initialDocId) ?? null;
@@ -216,9 +216,9 @@ export function EsWorkbench({
           {savedNote && <p className="rounded-xl bg-mint-50 px-3.5 py-2.5 text-sm text-mint-700">✓ {savedNote}</p>}
 
           {ai.allowed ? (
-            <Button onClick={submit} loading={loading} disabled={!question.trim() || draft.trim().length < 10 || ai.left === 0} className="w-full">
+            <Button onClick={submit} loading={loading} disabled={!question.trim() || draft.trim().length < 10 || (ai.left === 0 && !ai.points)} className="w-full">
               <WandSparkles className="size-4" />
-              {loading ? "AI 正在添削…（约 20–60 秒）" : ai.left === 0 ? "今天的 AI 添削次数已用完" : `AI 添削${ai.left != null ? `（今天剩 ${ai.left} 次）` : ""}`}
+              {loading ? "AI 正在添削…（约 20–60 秒）" : ai.left === 0 ? (ai.points ? `AI 添削（用 1 point，余额 ${ai.points}）` : "今天的 AI 添削次数已用完") : `AI 添削${ai.left != null ? `（今天剩 ${ai.left} 次）` : ""}`}
             </Button>
           ) : (
             <p className="rounded-xl bg-lemon-50 px-3.5 py-2.5 text-xs leading-relaxed text-lemon-700">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ClipboardCheck, House, LogOut, Mail, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
+import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -44,6 +44,7 @@ export function SideNav({ name, provider, isAdmin, counts }: { name: string; pro
         {[
           ...items,
           ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, badge: counts.pending }] : []),
+          { href: "/points", label: "积分", icon: Coins },
           { href: "/notifications", label: "通知", icon: Bell, badge: counts.notices },
           { href: "/feedback", label: "意见反馈", icon: MessageSquareHeart, badge: counts.replies },
           { href: "/settings", label: "设置", icon: Settings },
@@ -59,7 +60,7 @@ export function SideNav({ name, provider, isAdmin, counts }: { name: string; pro
               )}
             >
               <it.icon className="size-[18px]" />
-              {({ 选考: "选考追踪", 邮件: "邮件助手", 经验: "经验分享" } as Record<string, string>)[it.label] ?? it.label}
+              {({ 选考: "选考追踪", 邮件: "邮件助手", 经验: "经验分享", 积分: "积分 · Point Market" } as Record<string, string>)[it.label] ?? it.label}
               <Dot n={it.badge ?? 0} />
             </Link>
           );
@@ -119,6 +120,9 @@ export function MobileTopBar({ isAdmin, counts }: { isAdmin: boolean; counts: Co
             {counts.pending > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
           </Link>
         )}
+        <Link href="/points" className="rounded-full p-2 text-lemon-700 hover:bg-paper" aria-label="积分">
+          <Coins className="size-5" />
+        </Link>
         <Link href="/notifications" className="relative rounded-full p-2 text-muted hover:bg-paper" aria-label="通知">
           <Bell className="size-5" />
           {counts.notices > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}

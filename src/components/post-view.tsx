@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Clock3, Heart, Star, TriangleAlert } from "lucide-react";
 import { Badge, cx } from "./ui";
-import { POST_KINDS, POST_RESULTS, excerpt, parseBody, staleness, timeLabel, type Post } from "@/lib/community";
+import { POST_KINDS, POST_RESULTS, POST_STATUS, excerpt, parseBody, staleness, timeLabel, type Post } from "@/lib/community";
 
 export function TimePill({ post, className }: { post: Pick<Post, "kind" | "occurred_on" | "ended_on" | "grad_year">; className?: string }) {
   return (
@@ -61,8 +61,8 @@ export function PostCard({ post, showStatus = false }: { post: Post; showStatus?
           <h3 className="mt-1 font-semibold leading-snug">{post.title}</h3>
         </div>
         {showStatus && (
-          <Badge tone={post.status === "published" ? "mint" : post.status === "hidden" ? "rose" : "lemon"}>
-            {post.status === "published" ? "已发布" : post.status === "hidden" ? "已被隐藏" : "草稿"}
+          <Badge tone={POST_STATUS[post.status]?.tone}>
+            {post.status === "hidden" ? "已被隐藏" : (POST_STATUS[post.status]?.label ?? post.status)}
           </Badge>
         )}
       </div>

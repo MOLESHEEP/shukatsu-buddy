@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readJson, withUser } from "@/lib/api";
 import { query, queryOne } from "@/lib/db";
 import { countChars, reviewEs } from "@/lib/llm/tasks";
-import { checkQuota } from "@/lib/quota";
+import { withQuota } from "@/lib/quota";
 import { requireAi } from "@/lib/ai-access";
 
 export const maxDuration = 120;
@@ -17,7 +17,6 @@ const Body = z.object({
 
 export const POST = withUser(async (req, user) => {
   await requireAi(user);
-  await checkQuota(user, "es");
   const b = await readJson(req, Body);
 
   let companyName = b.company_name;
@@ -35,13 +34,16 @@ export const POST = withUser(async (req, user) => {
 
   const limit = b.char_limit ?? null;
   const input = { company: companyName, question: b.question, charLimit: limit, draft: b.draft, companyNotes, profile: user };
-  let review = await reviewEs(input, user.id);
-  let count = countChars(review.rewritten);
-  // The model occasionally overshoots the limit; one tightening pass (not counted toward the daily limit) usually fixes it.
-  if (limit && count > limit) {
-    review = await reviewEs({ ...input, tighten: { previous: review.rewritten, count } }, user.id);
-    count = countChars(review.rewritten);
-  }
+  const { review, count } = await withQuota(user, "es", async () => {
+    let review = await reviewEs(input, user.id);
+    let count = countChars(review.rewritten);
+    // The model occasionally overshoots the limit; one tightening pass (not counted toward the daily limit) usually fixes it.
+    if (limit && count > limit) {
+      review = await reviewEs({ ...input, tighten: { previous: review.rewritten, count } }, user.id);
+      count = countChars(review.rewritten);
+    }
+    return { review, count };
+  });
 
   const doc = await queryOne<{ id: number }>(
     `INSERT INTO es_docs (user_id, company_id, company_name, question, char_limit, draft, rewritten, review)

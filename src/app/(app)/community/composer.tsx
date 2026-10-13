@@ -10,7 +10,7 @@ import { api, errMsg } from "@/lib/client";
 
 export type ComposerInitial = {
   id?: number;
-  status?: "draft" | "published" | "hidden";
+  status?: Post["status"];
   kind: PostKind;
   company_name: string;
   industry: string;
@@ -45,7 +45,7 @@ export function Composer({
 }: {
   initial: ComposerInitial;
   profileGradYear: number | null;
-  ai: { allowed: boolean; left: number | null; userId: number };
+  ai: { allowed: boolean; left: number | null; points: number; userId: number };
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(initial.id ? "edit" : "describe");
@@ -123,8 +123,13 @@ export function Composer({
     setError(null);
     try {
       const id = f.id ?? (await persist());
-      await api(`/api/posts/${id}`, { method: "PATCH", body: { post: payload(), action: "publish", confirmed } });
-      router.push(`/community/${id}`);
+      const { review } = await api<{ review: { status: string; reward: { awarded: number; capped: boolean } | null } }>(`/api/posts/${id}`, {
+        method: "PATCH",
+        body: { post: payload(), action: "publish", confirmed },
+      });
+      // The post page shows the review result (approved + points / rejected with reason / waiting).
+      const r = review.status === "published" ? (review.reward?.awarded ? `awarded` : review.reward?.capped ? "capped" : "approved") : review.status;
+      router.push(`/community/${id}?review=${r}`);
       router.refresh();
     } catch (e) {
       setError(errMsg(e));
@@ -271,9 +276,9 @@ export function Composer({
               <Button variant="ghost" disabled={!metaReady} onClick={() => setStep("edit")}>
                 跳过，自己写
               </Button>
-              <Button onClick={generate} loading={busy === "draft"} disabled={!metaReady || f.notes.trim().length < 15 || !ai.allowed || ai.left === 0}>
+              <Button onClick={generate} loading={busy === "draft"} disabled={!metaReady || f.notes.trim().length < 15 || !ai.allowed || (ai.left === 0 && !ai.points)}>
                 <WandSparkles className="size-4" />
-                {busy === "draft" ? "AI 正在整理…" : ai.left === 0 ? "今天的 AI 整理次数已用完" : `AI 帮我整理${ai.left != null ? `（今天剩 ${ai.left} 次）` : ""}`}
+                {busy === "draft" ? "AI 正在整理…" : ai.left === 0 ? (ai.points ? `AI 帮我整理（用 1 point，余额 ${ai.points}）` : "今天的 AI 整理次数已用完") : `AI 帮我整理${ai.left != null ? `（今天剩 ${ai.left} 次）` : ""}`}
               </Button>
             </div>
             {!metaReady && <p className="text-right text-xs text-muted">请先填写公司和时间</p>}
@@ -344,7 +349,7 @@ export function Composer({
               </Button>
               <div className="flex flex-col-reverse gap-2 sm:flex-row">
                 {f.status === "hidden" && <span className="self-center text-xs text-sakura-700">已被管理员隐藏，只能保存修改</span>}
-                {f.status !== "published" && (
+                {f.status !== "published" && f.status !== "pending" && (
                   <Button variant="soft" onClick={saveDraft} loading={busy === "save"} disabled={!f.title.trim() || f.body.trim().length < 20}>
                     保存草稿
                   </Button>
@@ -357,7 +362,7 @@ export function Composer({
                   }}
                   disabled={!f.title.trim() || f.body.trim().length < 20 || f.status === "hidden"}
                 >
-                  预览{f.status === "published" ? "并更新" : "并发布"} →
+                  预览{f.status === "published" || f.status === "pending" ? "并更新" : "并发布"} →
                 </Button>
               </div>
             </div>
@@ -403,13 +408,18 @@ export function Composer({
                 我已检查以上内容：内容是我的真实经历，<b>不包含</b>面试官或同事的姓名、联系方式，以及公司的机密信息。
               </span>
             </label>
+            <p className="rounded-xl bg-violet-50 px-3.5 py-2.5 text-xs leading-relaxed text-violet-700">
+              🧾 提交后会先审核（通常由 AI 在几秒内完成，拿不准时交给管理员），通过后公开并获得 <b>1 point</b>（每天获得的 point 有上限，同一篇只奖励一次）。
+              {f.status === "published" && " 修改已发布的分享也要重新审核，审核通过前暂时不公开。"}
+              审核要求：真实有效的求职/工作经历，不含反动、色情、暴力、营销引流、诋毁或人身攻击内容。
+            </p>
             <ErrorNote message={error} />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
               <Button variant="ghost" onClick={() => setStep("edit")}>
                 <ArrowLeft className="size-4" /> 返回修改
               </Button>
               <Button onClick={publish} disabled={!confirmed} loading={busy === "publish"}>
-                <Sparkles className="size-4" /> 确认{f.status === "published" ? "更新" : "发布"}
+                <Sparkles className="size-4" /> {busy === "publish" ? "正在审核…" : `提交审核并${f.status === "published" || f.status === "pending" ? "更新" : "发布"}`}
               </Button>
             </div>
           </Card>

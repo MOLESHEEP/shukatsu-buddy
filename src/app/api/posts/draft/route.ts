@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readJson, withUser } from "@/lib/api";
 import { draftPost } from "@/lib/llm/tasks";
 import { sectionsToBody, timeLabel } from "@/lib/community";
-import { checkQuota } from "@/lib/quota";
+import { withQuota } from "@/lib/quota";
 import { requireAi } from "@/lib/ai-access";
 
 export const maxDuration = 120;
@@ -23,19 +23,18 @@ const Body = z.object({
 /** AI turns the user's rough description into an editable draft. Nothing is saved or published here. */
 export const POST = withUser(async (req, user) => {
   await requireAi(user);
-  await checkQuota(user, "post");
   const b = await readJson(req, Body);
   const extra =
     b.kind === "interview"
       ? [b.stage && `阶段：${b.stage}`, b.result && b.result !== "unknown" && `结果：${{ passed: "通过", failed: "未通过", pending: "等待结果" }[b.result] ?? b.result}`]
       : [b.employment_type && `雇佣形式：${b.employment_type}`];
-  const draft = await draftPost({
+  const draft = await withQuota(user, "post", () => draftPost({
     kind: b.kind,
     company: b.company_name,
     role: b.role,
     timeLabel: timeLabel({ kind: b.kind, occurred_on: b.occurred_on, ended_on: b.ended_on ?? null, grad_year: b.grad_year ?? null }),
     extra: extra.filter(Boolean).join("；"),
     notes: b.notes,
-  }, user.id);
+  }, user.id));
   return { ...draft, body: sectionsToBody(draft.sections) };
 });
