@@ -6,7 +6,7 @@ import { Check, Copy } from "lucide-react";
 import { Badge, Button, Card, ErrorNote, Field, Input } from "@/components/ui";
 import { api, errMsg } from "@/lib/client";
 
-type Quota = { unlimited: boolean; used: { es: number; email: number; post: number }; limit: { es: number; email: number; post: number } };
+type Quota = { unlimited: boolean; used: { es: number; email: number; post: number }; limit: { es: number; email: number; post: number }; points: number; autoPoints: boolean };
 
 export function AiStatusCard({ userId, isAdmin, ai, quota }: { userId: number; isAdmin: boolean; ai: { allowed: boolean; demo: boolean }; quota: Quota }) {
   const [copied, setCopied] = useState(false);
@@ -59,6 +59,14 @@ export function AiStatusCard({ userId, isAdmin, ai, quota }: { userId: number; i
             })}
           </div>
         </div>
+      )}
+      {ai.allowed && !isAdmin && (
+        <Link href="/points" className="flex items-center justify-between rounded-xl bg-lemon-50 px-3 py-2 text-xs text-lemon-700 hover:bg-lemon-100">
+          <span>
+            🪙 point 余额 <b className="tabular-nums">{quota.points}</b> · 免费次数用完后{quota.autoPoints ? "自动用 point 继续" : "不使用 point"}
+          </span>
+          <span>Point Market →</span>
+        </Link>
       )}
       {ai.demo && <p className="text-xs text-violet-700">当前站点处于演示模式，AI 返回示例结果。</p>}
       {isAdmin ? (

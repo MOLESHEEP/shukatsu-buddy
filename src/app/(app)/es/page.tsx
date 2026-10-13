@@ -37,7 +37,7 @@ export default async function EsPage({ searchParams }: { searchParams: Promise<{
         docs={docs}
         initialCompanyId={sp.company ? Number(sp.company) : null}
         initialDocId={sp.doc ? Number(sp.doc) : null}
-        ai={{ allowed: ai.allowed, left, userId: user.id }}
+        ai={{ allowed: ai.allowed, left, points: quota.autoPoints ? quota.points : 0, userId: user.id }}
       />
     </>
   );

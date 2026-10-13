@@ -12,7 +12,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const badges = await queryOne<{ replies: number; pending: number }>(
     `SELECT (SELECT count(*) FROM feedback WHERE user_id = $1 AND reply_seen = false)::int AS replies,
             CASE WHEN $2::boolean THEN (SELECT count(*) FROM feedback WHERE status = 'new')::int
-                                     + (SELECT count(*) FROM post_reports WHERE status = 'open')::int ELSE 0 END AS pending`,
+                                     + (SELECT count(*) FROM post_reports WHERE status = 'open')::int
+                                     + (SELECT count(*) FROM posts WHERE status = 'pending')::int ELSE 0 END AS pending`,
     [user.id, isAdmin],
   );
   const counts = { replies: badges?.replies ?? 0, pending: badges?.pending ?? 0, notices: await unreadCount(user.id) };

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Check, ChevronDown, Copy, Crown, KeyRound, RotateCcw, ShieldCheck, ShieldMinus, ShieldPlus, Sparkles } from "lucide-react";
+import { Ban, Check, ChevronDown, Coins, Copy, Crown, KeyRound, RotateCcw, ShieldCheck, ShieldMinus, ShieldPlus, Sparkles } from "lucide-react";
 import { Badge, Button, EmptyState, Input, cx } from "@/components/ui";
 import { api, errMsg } from "@/lib/client";
 import type { AdminUserRow } from "@/lib/admin";
@@ -31,6 +31,7 @@ function UserRow({ u, isMe, defaults, viewerSuper }: { u: AdminUserRow; isMe: bo
     limit_post: u.limit_post?.toString() ?? "",
   });
   const [resetLink, setResetLink] = useState<string | null>(null);
+  const [adjust, setAdjust] = useState({ delta: "", note: "" });
   const [copied, setCopied] = useState(false);
   const admin = u.role === "admin";
   const aiOn = admin || (u.ai_enabled ?? defaults.ai);
@@ -55,6 +56,24 @@ function UserRow({ u, isMe, defaults, viewerSuper }: { u: AdminUserRow; isMe: bo
         : `取消 ${u.email} 的管理员权限？对方会立即变回普通用户。`;
     if (!confirm(msg)) return;
     await patch({ role });
+  }
+
+  async function adjustPoints() {
+    const delta = Number(adjust.delta);
+    if (!Number.isInteger(delta) || !delta) return setError("请输入非 0 的整数（负数为扣除）");
+    if (!adjust.note.trim()) return setError("请写明调整原因（会记录在用户的 point 明细里）");
+    if (!confirm(`${delta > 0 ? "给" : "从"} ${u.email} ${delta > 0 ? "增加" : "扣除"} ${Math.abs(delta)} point？`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/api/admin/points", { body: { user_id: u.id, delta, note: adjust.note } });
+      setAdjust({ delta: "", note: "" });
+      router.refresh();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function makeResetLink() {
@@ -130,6 +149,9 @@ function UserRow({ u, isMe, defaults, viewerSuper }: { u: AdminUserRow; isMe: bo
           </div>
         )}
         <Badge tone={aiOn ? "mint" : "stone"}>{aiOn ? "可用 AI" : "无 AI"}</Badge>
+        <Badge tone="lemon">
+          <Coins className="size-3" /> {u.points}
+        </Badge>
 
         <div className="hidden gap-2 text-xs tabular-nums text-muted md:flex">
           {usage.map((x) => (
@@ -162,8 +184,20 @@ function UserRow({ u, isMe, defaults, viewerSuper }: { u: AdminUserRow; isMe: bo
               ))}
             </div>
             <p className="mt-1.5 text-xs text-muted">
-              今日已用：{usage.map((x) => `${x.label} ${x.used}`).join(" · ")} · 累计 AI 调用 {u.total_ai} 次 · 发帖 {u.posts}
+              今日已用：{usage.map((x) => `${x.label} ${x.used}`).join(" · ")} · 累计 AI 调用 {u.total_ai} 次 · 发帖 {u.posts} · point {u.points}
             </p>
+            {viewerSuper && (
+              <div className="mt-2.5">
+                <p className="text-xs font-medium">调整 point（超级管理员）</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  <Input type="number" className="w-24 py-1.5" placeholder="+5 / -2" value={adjust.delta} onChange={(e) => setAdjust((s) => ({ ...s, delta: e.target.value }))} />
+                  <Input className="w-auto min-w-0 flex-1 py-1.5" maxLength={200} placeholder="原因，例如：补发 / 活动奖励" value={adjust.note} onChange={(e) => setAdjust((s) => ({ ...s, note: e.target.value }))} />
+                  <Button size="sm" variant="soft" disabled={busy || !adjust.delta} onClick={adjustPoints}>
+                    调整
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Button

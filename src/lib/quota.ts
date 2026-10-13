@@ -3,6 +3,7 @@ import { query, queryOne } from "./db";
 import { HttpError } from "./api";
 import type { User } from "./auth";
 import { APP_TZ } from "./time";
+import { refundAi, spendForAi } from "./points";
 
 /**
  * Daily AI limits, reset at midnight in APP_TIMEZONE.
@@ -53,14 +54,14 @@ async function usedToday(userId: number): Promise<Limits> {
   return { es: sum("es"), email: sum("email"), post: sum("post") };
 }
 
-export type QuotaStatus = { unlimited: boolean; used: Limits; limit: Limits };
+export type QuotaStatus = { unlimited: boolean; used: Limits; limit: Limits; points: number; autoPoints: boolean };
 
 export async function quotaStatus(user: User): Promise<QuotaStatus> {
   const [defaults, used, own] = await Promise.all([
     getDefaultLimits(),
     usedToday(user.id),
-    queryOne<{ limit_es: number | null; limit_email: number | null; limit_post: number | null }>(
-      `SELECT limit_es, limit_email, limit_post FROM users WHERE id = $1`,
+    queryOne<{ limit_es: number | null; limit_email: number | null; limit_post: number | null; points: number; points_auto_ai: boolean }>(
+      `SELECT limit_es, limit_email, limit_post, points, points_auto_ai FROM users WHERE id = $1`,
       [user.id],
     ),
   ]);
@@ -68,13 +69,29 @@ export async function quotaStatus(user: User): Promise<QuotaStatus> {
     unlimited: user.role === "admin",
     used,
     limit: { es: own?.limit_es ?? defaults.es, email: own?.limit_email ?? defaults.email, post: own?.limit_post ?? defaults.post },
+    points: own?.points ?? 0,
+    autoPoints: own?.points_auto_ai ?? true,
   };
 }
 
-export async function checkQuota(user: User, kind: QuotaKind) {
+/**
+ * Runs an AI action within the daily limit. Once today's free uses are gone, one point is spent
+ * (if the user allows it) and refunded when the action fails, so a failed call never costs anything.
+ */
+export async function withQuota<T>(user: User, kind: QuotaKind, fn: () => Promise<T>): Promise<T> {
   const q = await quotaStatus(user);
-  if (q.unlimited) return;
-  if (q.used[kind] >= q.limit[kind]) {
-    throw new HttpError(429, `今天的${QUOTA_LABELS[kind]}次数（${q.limit[kind]} 次）已用完，明天 0 点（日本时间）恢复`);
+  if (q.unlimited || q.used[kind] < q.limit[kind]) return fn();
+  const reset = "明天 0 点（日本时间）恢复";
+  if (!q.autoPoints) {
+    throw new HttpError(429, `今天的${QUOTA_LABELS[kind]}次数（${q.limit[kind]} 次）已用完，${reset}。你也可以在「积分」页开启用 point 继续使用`);
+  }
+  if (!(await spendForAi(user.id, kind))) {
+    throw new HttpError(429, `今天的${QUOTA_LABELS[kind]}次数（${q.limit[kind]} 次）已用完，${reset}。分享面试经验或工作体验并通过审核可以获得 point，1 点可多用 1 次`);
+  }
+  try {
+    return await fn();
+  } catch (err) {
+    await refundAi(user.id, kind, err instanceof Error ? err.message : "调用失败");
+    throw err;
   }
 }

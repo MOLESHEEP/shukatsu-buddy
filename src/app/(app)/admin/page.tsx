@@ -4,7 +4,7 @@ import { providerLabel } from "@/lib/llm/provider";
 import { PROVIDERS } from "@/lib/llm/providers";
 import { Card } from "@/components/ui";
 
-const TASK_LABELS: Record<string, string> = { es: "ES 添削", es_retry: "ES 字数压缩", email: "邮件识别", reply: "回信", post: "经验整理", test: "连接测试" };
+const TASK_LABELS: Record<string, string> = { es: "ES 添削", es_retry: "ES 字数压缩", email: "邮件识别", reply: "回信", post: "经验整理", review: "发布审核", test: "连接测试" };
 
 export default async function AdminOverview() {
   const [o, label] = await Promise.all([overview(), providerLabel()]);
@@ -14,6 +14,7 @@ export default async function AdminOverview() {
     { label: "7 天活跃", value: c.users_active_7d, sub: `已开通 AI ${c.users_ai_on} · 停用 ${c.users_banned}`, tone: "bg-mint-50 text-mint-700", href: "/admin/users" },
     { label: "新反馈", value: c.feedback_new, sub: `处理中 / 已采纳 ${c.feedback_open}`, tone: c.feedback_new ? "bg-lemon-50 text-lemon-700" : "bg-stone-50 text-stone-700", href: "/admin/feedback" },
     { label: "待处理举报", value: c.reports_open, sub: `已隐藏帖子 ${c.posts_hidden}`, tone: c.reports_open ? "bg-sakura-50 text-sakura-700" : "bg-stone-50 text-stone-700", href: "/admin/reports" },
+    { label: "待审核分享", value: c.posts_pending, sub: `用户持有 point ${c.points_outstanding}`, tone: c.posts_pending ? "bg-lemon-50 text-lemon-700" : "bg-stone-50 text-stone-700", href: "/admin/review" },
     { label: "已发布经验", value: c.posts_published, sub: `公司卡片 ${c.companies} · ES ${c.es_docs}`, tone: "bg-violet-50 text-violet-700", href: "/community" },
   ];
   const max = Math.max(1, ...o.daily.map((d) => d.calls));
@@ -21,7 +22,7 @@ export default async function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {tiles.map((t) => (
           <Link key={t.label} href={t.href} className={`rounded-[var(--radius-card)] p-5 transition hover:-translate-y-0.5 ${t.tone}`}>
             <div className="text-3xl font-bold tabular-nums">{t.value}</div>

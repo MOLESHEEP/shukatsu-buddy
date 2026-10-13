@@ -5,11 +5,13 @@ import {
   EsReviewSchema,
   ImportExtractSchema,
   PostDraftSchema,
+  PostReviewSchema,
   ReplySchema,
   type EmailParse,
   type EsReview,
   type ImportExtract,
   type PostDraft,
+  type PostReview,
   type ReplyDraft,
 } from "./schemas";
 import { REPLY_SCENARIOS } from "../constants";
@@ -338,4 +340,50 @@ function mockReply(scenario: string, company: string, name?: string): ReplyDraft
     body: `${company || "【会社名】"}\n人事部　【ご担当者様】\n\nお世話になっております。\n【大学名・学部】の${name || "【氏名】"}です。\n\nこの度は面接のご案内をいただき、誠にありがとうございます。\nご提示いただいた日程にて、ぜひ参加させていただきたく存じます。\n\n当日はどうぞよろしくお願い申し上げます。\n\n――――――――――\n${name || "【氏名】"}\n【大学名・学部・学年】\nTEL：【電話番号】\nMail：【メールアドレス】\n――――――――――`,
     notes_zh: ["【演示模式】配置 API Key 后会根据场景和来信真实生成", "回信标题保留对方原标题前的“Re:”，方便人事查找", "署名档写全学校、电话、邮箱"],
   };
+}
+
+// ---------------- 经验分享发布审核 ----------------
+
+const REVIEW_SYSTEM = `你是「就活小助手」经验分享社区的内容审核员。社区面向在日本求职、工作的中国人，用户分享面试经验和在日工作体验。
+请判断一篇投稿能否发布，规则如下（violations 用括号里的代码）：
+1. 有效经验（not_experience）：必须是作者自己的、与求职或在日工作相关的具体经历，例如选考流程、被问到的问题、工作内容、职场氛围、待遇感受等。
+   空洞水文、与求职/工作无关、明显复制粘贴的模板文字、只有一两句无信息量的内容、测试内容，都算不是有效经验。
+2. 反动 / 政治煽动（political）：煽动颠覆、分裂国家、极端主义、宣扬仇恨的政治内容。正常提及公司所在国家、签证政策等不算。
+3. 色情（sexual）：色情、性暗示露骨的内容。
+4. 暴力（violence）：宣扬或详细描写暴力、威胁他人。
+5. 营销（marketing）：广告、引流、推销课程/中介/代写、留联系方式（微信号、QQ、电话、外部群）、推广链接。
+6. 诋毁（defamation）：没有具体事实依据、恶意抹黑公司或他人的言论。对公司如实的负面评价（加班多、面试官态度差、待遇低）是有价值的经验，不算诋毁。
+7. 人身攻击（personal_attack）：辱骂、侮辱、歧视特定的人或群体。
+8. 隐私（privacy）：写出面试官、同事等个人的真实姓名或联系方式，或明显的公司机密。
+判断原则：
+- 只有在明确违反规则时才 reject，并在 reason_zh 里告诉作者具体哪里有问题、怎么改后可以重新提交。
+- 内容正常时 approve，不要因为文笔、篇幅较短但信息真实、观点负面而驳回。
+- 实在拿不准（例如可能是诋毁但也可能是真实经历）时选 unsure，交给人工审核。`;
+
+export async function reviewPost(post: {
+  kind: "interview" | "work";
+  company_name: string;
+  role: string;
+  title: string;
+  body: string;
+  tags: string[];
+}): Promise<PostReview> {
+  const prompt = [
+    `【类型】${post.kind === "interview" ? "面试经验" : "工作体验"}`,
+    `【公司】${post.company_name}${post.role ? ` · ${post.role}` : ""}`,
+    `【标题】${post.title}`,
+    post.tags.length ? `【标签】${post.tags.join("、")}` : "",
+    `【正文】\n${post.body}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return generate({
+    system: REVIEW_SYSTEM,
+    prompt,
+    schema: PostReviewSchema,
+    effort: "low",
+    mock: () => ({ decision: "unsure" as const, violations: [], reason_zh: "演示模式没有配置 AI，等待管理员人工审核。" }),
+    // Moderation is a site cost, not the author's AI use: no user id, so it never touches their daily limit.
+    ctx: { userId: null, task: "review" },
+  });
 }

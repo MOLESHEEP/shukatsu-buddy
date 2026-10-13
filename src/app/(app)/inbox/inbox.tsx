@@ -30,7 +30,7 @@ URL：https://zoom.us/j/1234567890
 
 type ParseResult = { id: number; parsed: EmailParse; match: { id: number; name: string } | null };
 
-type Ai = { allowed: boolean; left: number | null; userId: number };
+type Ai = { allowed: boolean; left: number | null; points: number; userId: number };
 
 function AiBlocked({ ai }: { ai: Ai }) {
   if (!ai.allowed)
@@ -39,7 +39,8 @@ function AiBlocked({ ai }: { ai: Ai }) {
         邮件助手需要 AI 功能，你的账号还没有开通。把用户 ID <b className="font-mono">{ai.userId}</b> 发给管理员即可开通。
       </p>
     );
-  if (ai.left === 0) return <p className="rounded-xl bg-sakura-50 px-3.5 py-2.5 text-xs text-sakura-700">今天的邮件助手次数已用完，明天 0 点（日本时间）恢复。</p>;
+  if (ai.left === 0 && ai.points > 0) return <p className="rounded-xl bg-violet-50 px-3.5 py-2.5 text-xs text-violet-700">今天的免费次数已用完，继续使用每次扣 1 point（余额 {ai.points}）。</p>;
+  if (ai.left === 0) return <p className="rounded-xl bg-sakura-50 px-3.5 py-2.5 text-xs text-sakura-700">今天的邮件助手次数已用完，明天 0 点（日本时间）恢复。分享经验通过审核可获得 point 继续使用。</p>;
   return null;
 }
 
@@ -151,7 +152,7 @@ function ParseView({ companies, onReply, ai }: { companies: { id: number; name: 
         </Field>
         <ErrorNote message={!res ? error : null} />
         <AiBlocked ai={ai} />
-        <Button onClick={parse} loading={loading} disabled={raw.trim().length < 10 || !ai.allowed || ai.left === 0} className="w-full bg-mint-500 hover:bg-mint-700">
+        <Button onClick={parse} loading={loading} disabled={raw.trim().length < 10 || !ai.allowed || (ai.left === 0 && !ai.points)} className="w-full bg-mint-500 hover:bg-mint-700">
           <Sparkles className="size-4" />
           {loading ? "AI 正在阅读…" : "识别邮件"}
         </Button>
@@ -356,7 +357,7 @@ function ReplyView({ seed, userName, ai }: { seed: { original: string; company: 
         </Field>
         <ErrorNote message={error} />
         <AiBlocked ai={ai} />
-        <Button onClick={generate} loading={loading} disabled={!ai.allowed || ai.left === 0} className="w-full bg-mint-500 hover:bg-mint-700">
+        <Button onClick={generate} loading={loading} disabled={!ai.allowed || (ai.left === 0 && !ai.points)} className="w-full bg-mint-500 hover:bg-mint-700">
           <Sparkles className="size-4" /> 生成回信
         </Button>
       </Card>

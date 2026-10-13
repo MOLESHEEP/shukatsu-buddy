@@ -11,7 +11,7 @@ export const metadata = { title: "编辑分享" };
 export default async function EditPostPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const [access, quota] = await Promise.all([aiAccess(user), quotaStatus(user)]);
-  const ai = { allowed: access.allowed, left: quota.unlimited ? null : Math.max(0, quota.limit.post - quota.used.post), userId: user.id };
+  const ai = { allowed: access.allowed, left: quota.unlimited ? null : Math.max(0, quota.limit.post - quota.used.post), points: quota.autoPoints ? quota.points : 0, userId: user.id };
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const found = await getOwnPostWithNotes(user.id, id);
@@ -19,7 +19,13 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
   const { post, notes } = found;
   return (
     <>
-      <PageHeader emoji="✏️" title="编辑分享" subtitle={post.status === "published" ? "修改后需要再次预览确认，才会更新已发布的内容。" : "草稿仅自己可见。"} />
+      <PageHeader emoji="✏️" title="编辑分享" subtitle={
+          post.status === "published" || post.status === "pending"
+            ? "修改后需要预览确认并重新审核，审核通过前其他人看不到这篇分享。"
+            : post.status === "rejected"
+              ? `上次未通过审核：${post.review_note || "不符合社区规则"}。修改后可以重新提交。`
+              : "草稿仅自己可见。"
+        } />
       <Composer
         profileGradYear={user.grad_year}
         ai={ai}

@@ -3,7 +3,7 @@ import { readJson, withUser } from "@/lib/api";
 import { queryOne } from "@/lib/db";
 import { parseEmail } from "@/lib/llm/tasks";
 import { query } from "@/lib/db";
-import { checkQuota } from "@/lib/quota";
+import { withQuota } from "@/lib/quota";
 import { requireAi } from "@/lib/ai-access";
 
 export const maxDuration = 90;
@@ -12,9 +12,8 @@ const Body = z.object({ raw: z.string().trim().min(10).max(20000) });
 
 export const POST = withUser(async (req, user) => {
   await requireAi(user);
-  await checkQuota(user, "email");
   const { raw } = await readJson(req, Body);
-  const parsed = await parseEmail(raw, user.id);
+  const parsed = await withQuota(user, "email", () => parseEmail(raw, user.id));
   const row = await queryOne<{ id: string }>(`INSERT INTO emails (user_id, raw, parsed) VALUES ($1, $2, $3) RETURNING id`, [
     user.id,
     raw,

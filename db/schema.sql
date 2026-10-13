@@ -276,3 +276,34 @@ CREATE TABLE IF NOT EXISTS post_reports (
 );
 CREATE INDEX IF NOT EXISTS post_reports_open_idx ON post_reports(status, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS post_reports_once_idx ON post_reports(post_id, reporter_id) WHERE status = 'open';
+
+-- ---------- v0.10: 发布审核 + 积分（point） ----------
+-- Posts: status may also be 'pending' (waiting for review) or 'rejected' (review failed; only the author sees it).
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS review_note   TEXT NOT NULL DEFAULT '';      -- why it was rejected / sent to manual review
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS review_by     TEXT NOT NULL DEFAULT '';      -- '' | ai | admin
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS reviewer_id   BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS reviewed_at   TIMESTAMPTZ;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS submitted_at  TIMESTAMPTZ;                   -- last time the author sent it for review
+-- '' = no reward yet, 'awarded' = point given, 'capped' = approved on a day the author had already hit the daily cap.
+-- A post is rewarded at most once, however often it is edited and re-reviewed.
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS reward        TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS posts_review_idx ON posts(status, submitted_at) WHERE status IN ('pending', 'rejected');
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS points         INT NOT NULL DEFAULT 0;
+-- Spend a point automatically when today's free AI uses run out.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS points_auto_ai BOOLEAN NOT NULL DEFAULT true;
+
+-- Every change to a balance. users.points is the running total, kept in step inside one transaction.
+CREATE TABLE IF NOT EXISTS point_ledger (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  delta           INT NOT NULL,
+  kind            TEXT NOT NULL,                        -- post_reward | ai_extra | ai_refund | admin_adjust | redeem
+  item            TEXT NOT NULL DEFAULT '',             -- market item id / AI quota kind
+  post_id         BIGINT REFERENCES posts(id) ON DELETE SET NULL,
+  note            TEXT NOT NULL DEFAULT '',
+  actor_id        BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  balance_after   INT NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS point_ledger_user_idx ON point_ledger(user_id, created_at DESC);

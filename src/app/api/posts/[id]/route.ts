@@ -2,6 +2,9 @@ import { z } from "zod";
 import { HttpError, idParam, readJson, withUser } from "@/lib/api";
 import { query, queryOne } from "@/lib/db";
 import { PostInput } from "@/lib/validators";
+import { submitForReview } from "@/lib/review";
+
+export const maxDuration = 120;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,6 +26,11 @@ export const PATCH = withUser<Ctx>(async (req, user, { params }) => {
   const current = await own(user.id, id);
   const { post: p, action, confirmed } = await readJson(req, Body);
   if (current.status === "hidden" && action !== "save") throw new HttpError(403, "这篇分享已被管理员隐藏，暂时不能重新发布");
+  // Public content only changes through review: edits to a live (or queued) post must be resubmitted.
+  if (p && action === "save" && (current.status === "published" || current.status === "pending")) {
+    throw new HttpError(400, "已发布的分享修改后需要重新审核，请用「预览并更新」提交");
+  }
+  if (action === "publish" && confirmed !== true) throw new HttpError(400, "请先在预览中确认内容后再发布");
 
   if (p) {
     await query(
@@ -54,10 +62,11 @@ export const PATCH = withUser<Ctx>(async (req, user, { params }) => {
   }
 
   if (action === "publish") {
-    if (confirmed !== true) throw new HttpError(400, "请先在预览中确认内容后再发布");
-    await query(`UPDATE posts SET status = 'published', published_at = COALESCE(published_at, now()), updated_at = now() WHERE id = $1`, [id]);
-  } else if (action === "unpublish") {
-    await query(`UPDATE posts SET status = 'draft', updated_at = now() WHERE id = $1`, [id]);
+    // Goes to review; AI may approve (and reward a point) or reject right away, otherwise an admin decides.
+    return { ok: true, review: await submitForReview(id, user.id) };
+  }
+  if (action === "unpublish") {
+    await query(`UPDATE posts SET status = 'draft', updated_at = now() WHERE id = $1 AND status IN ('published', 'pending', 'rejected')`, [id]);
   }
   return { ok: true };
 });
