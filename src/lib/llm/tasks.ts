@@ -382,7 +382,7 @@ export async function reviewPost(post: {
     prompt,
     schema: PostReviewSchema,
     effort: "low",
-    mock: () => ({ decision: "unsure", violations: [], reason_zh: "演示模式没有配置 AI，等待管理员人工审核。" }),
+    mock: () => ({ decision: "unsure" as const, violations: [], reason_zh: "演示模式没有配置 AI，等待管理员人工审核。" }),
     // Moderation is a site cost, not the author's AI use: no user id, so it never touches their daily limit.
     ctx: { userId: null, task: "review" },
   });
