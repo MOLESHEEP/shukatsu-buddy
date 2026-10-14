@@ -44,7 +44,8 @@ export default async function PointsPage() {
           <p className="font-semibold">怎么获得 point</p>
           <ul className="space-y-1.5 text-sm text-muted">
             <li>🎤 分享一篇<b className="text-ink">面试经验</b>，或 💼 一篇<b className="text-ink">工作体验</b></li>
-            <li>🧾 通过审核后自动 +{POINTS_PER_POST} point（同一篇只奖励一次）</li>
+            <li>📣 公开<b className="text-ink">上报本选考开放信息</b></li>
+            <li>🧾 通过审核后自动 +{POINTS_PER_POST} point（同一篇 / 同一条只奖励一次）</li>
             <li>📅 每天最多获得 {s.dailyCap} point</li>
           </ul>
           <p className="text-xs text-muted">审核要求：真实有效的求职 / 工作经历，不含反动、色情、暴力、营销引流、诋毁、人身攻击和他人隐私。</p>
@@ -116,6 +117,10 @@ export default async function PointsPage() {
                     {h.post_id && h.kind === "post_reward" ? (
                       <Link href={`/community/${h.post_id}`} className="hover:text-sakura-600">
                         {detail || "查看分享"}
+                      </Link>
+                    ) : h.kind === "opening_reward" ? (
+                      <Link href="/openings?tab=mine" className="hover:text-sakura-600">
+                        {detail || "查看上报"}
                       </Link>
                     ) : (
                       <span className="text-muted">{detail}</span>

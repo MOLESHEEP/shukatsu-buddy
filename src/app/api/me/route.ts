@@ -47,6 +47,10 @@ export const DELETE = withUser(async (req, user) => {
     await query(`DELETE FROM es_docs WHERE user_id = $1`, [user.id]);
     await query(`DELETE FROM posts WHERE user_id = $1`, [user.id]);
     await query(`DELETE FROM post_votes WHERE user_id = $1`, [user.id]);
+    await query(`DELETE FROM opening_follows WHERE user_id = $1`, [user.id]);
+    await query(`DELETE FROM opening_reports WHERE user_id = $1`, [user.id]);
+    // Published 选考 records stay (others rely on them) but no longer point to this user.
+    await query(`UPDATE openings SET reporter_id = NULL, anonymous = true WHERE reporter_id = $1`, [user.id]);
   }
   return { ok: true };
 });

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
+import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, Megaphone, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -43,6 +43,7 @@ export function SideNav({ name, provider, isAdmin, counts }: { name: string; pro
       <nav className="mt-8 space-y-1">
         {[
           ...items,
+          { href: "/openings", label: "选考开放", icon: Megaphone },
           ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, badge: counts.pending }] : []),
           { href: "/points", label: "积分", icon: Coins },
           { href: "/notifications", label: "通知", icon: Bell, badge: counts.notices },
