@@ -10,6 +10,7 @@ const tabs = [
   { href: "/admin/notify", label: "📣 通知" },
   { href: "/admin/feedback", label: "💡 反馈" },
   { href: "/admin/review", label: "🧾 发布审核" },
+  { href: "/admin/openings", label: "📣 选考开放" },
   { href: "/admin/reports", label: "🚩 举报" },
   { href: "/admin/import", label: "📥 批量导入" },
   { href: "/admin/signup", label: "🚪 注册与邀请" },

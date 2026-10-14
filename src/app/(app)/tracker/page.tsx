@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, Rss, SquareKanban } from "lucide-react";
+import { CalendarDays, Megaphone, Rss, SquareKanban } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { calendarItems, listCompanies } from "@/lib/data";
 import { localToIso, todayLocal } from "@/lib/time";
@@ -54,10 +54,16 @@ export default async function TrackerPage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </div>
-        <Link href="/settings#calendar" className="flex items-center gap-1.5 text-sm text-muted hover:text-sakura-600">
-          <Rss className="size-4" />
-          订阅到手机日历，自动提醒
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link href="/openings" className="flex items-center gap-1.5 text-sm text-muted hover:text-sakura-600">
+            <Megaphone className="size-4" />
+            本选考开放信息
+          </Link>
+          <Link href="/settings#calendar" className="flex items-center gap-1.5 text-sm text-muted hover:text-sakura-600">
+            <Rss className="size-4" />
+            订阅到手机日历，自动提醒
+          </Link>
+        </div>
       </div>
       {view === "kanban" ? <Kanban companies={companies} /> : calendar}
     </>

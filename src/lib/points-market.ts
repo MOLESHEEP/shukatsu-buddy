@@ -27,6 +27,7 @@ export const MARKET_ITEMS: MarketItem[] = [
 
 export const POINT_KINDS: Record<string, { label: string; tone: string }> = {
   post_reward: { label: "分享通过审核", tone: "mint" },
+  opening_reward: { label: "选考信息通过审核", tone: "mint" },
   ai_extra: { label: "AI 额外次数", tone: "violet" },
   ai_refund: { label: "AI 调用失败退还", tone: "sky" },
   admin_adjust: { label: "管理员调整", tone: "lemon" },

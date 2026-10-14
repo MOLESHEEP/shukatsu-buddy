@@ -11,6 +11,8 @@ import { formatDateTime, isoToLocalInput } from "@/lib/time";
 import type { CalEvent, Company, Stage, Test } from "@/lib/data";
 import { POST_KINDS, type Post } from "@/lib/community";
 import { TimePill } from "@/components/post-view";
+import { PHASES, formatOpeningDate, openingPhase, type Opening } from "@/lib/openings-shared";
+import { FollowButton } from "../../openings/client";
 
 type Props = {
   company: Company;
@@ -19,9 +21,10 @@ type Props = {
   events: CalEvent[];
   esDocs: { id: number; question: string; created_at: string }[];
   posts: Post[];
+  openings: { key: string; following: boolean; openings: Opening[] };
 };
 
-export function CompanyDetail({ company, stages, tests, events, esDocs, posts }: Props) {
+export function CompanyDetail({ company, stages, tests, events, esDocs, posts, openings }: Props) {
   const router = useRouter();
   const status = COMPANY_STATUS[company.status];
 
@@ -68,6 +71,7 @@ export function CompanyDetail({ company, stages, tests, events, esDocs, posts }:
         <div className="space-y-6">
           <InfoCard company={company} />
           <TestsCard companyId={company.id} tests={tests} />
+          <OpeningsCard name={company.name} info={openings} />
           <Card>
             <div className="flex items-center justify-between">
               <h2 className="font-semibold">前辈经验</h2>
@@ -113,6 +117,41 @@ export function CompanyDetail({ company, stages, tests, events, esDocs, posts }:
         </div>
       </div>
     </div>
+  );
+}
+
+/** Public 本选考 records for this company, and following it for notices. */
+function OpeningsCard({ name, info }: { name: string; info: Props["openings"] }) {
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-semibold">本选考开放</h2>
+        <FollowButton name={name} companyKey={info.key} following={info.following} />
+      </div>
+      {info.openings.length ? (
+        <ul className="mt-2 divide-y divide-line">
+          {info.openings.map((o) => {
+            const phase = PHASES[openingPhase(o)];
+            return (
+              <li key={o.id} className="py-2.5 text-sm">
+                <Link href={`/openings?focus=${o.id}#o-${o.id}`} className="flex flex-wrap items-center gap-1.5 hover:text-sakura-600">
+                  <Badge tone={phase.tone}>{phase.label}</Badge>
+                  {o.grad_year ? `${o.grad_year} 届` : "不限届"}
+                </Link>
+                <p className="mt-1 text-xs text-muted">
+                  {[o.opens_at && `开放 ${formatOpeningDate(o.opens_at)}`, o.deadline && `截止 ${formatOpeningDate(o.deadline)}`].filter(Boolean).join(" · ")}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm text-muted">{info.following ? "还没有开放信息，开放时会通知你。" : "还没有开放信息。关注后，有人上报或管理员发布时会通知你。"}</p>
+      )}
+      <Link href={`/openings/new?company=${encodeURIComponent(name)}`} className="mt-3 inline-block text-sm font-medium text-sakura-600 hover:underline">
+        ＋ 上报开放信息
+      </Link>
+    </Card>
   );
 }
 

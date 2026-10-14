@@ -47,7 +47,19 @@ export async function savePointSettings(value: PointSettings) {
 const tz = APP_TZ.replace(/'/g, "");
 const startOfToday = `(date_trunc('day', now() AT TIME ZONE '${tz}') AT TIME ZONE '${tz}')`;
 
-type Change = { userId: number; delta: number; kind: string; item?: string; postId?: number | null; note?: string; actorId?: number | null };
+type Change = {
+  userId: number;
+  delta: number;
+  kind: string;
+  item?: string;
+  postId?: number | null;
+  openingReportId?: number | null;
+  note?: string;
+  actorId?: number | null;
+};
+
+/** Kinds that count toward the daily earning cap (shared by 经验分享 and 选考信息上报). */
+const CAPPED_KINDS = `kind IN ('post_reward', 'opening_reward')`;
 
 /** Applies one change inside a transaction. A balance can never go below zero. */
 async function change(q: Q, c: Change): Promise<number> {
@@ -55,10 +67,22 @@ async function change(q: Q, c: Change): Promise<number> {
   if (!rows.length) throw new HttpError(409, "point 不足");
   const balance = rows[0].points;
   await q(
-    `INSERT INTO point_ledger (user_id, delta, kind, item, post_id, note, actor_id, balance_after) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [c.userId, c.delta, c.kind, c.item ?? "", c.postId ?? null, c.note ?? "", c.actorId ?? null, balance],
+    `INSERT INTO point_ledger (user_id, delta, kind, item, post_id, opening_report_id, note, actor_id, balance_after) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [c.userId, c.delta, c.kind, c.item ?? "", c.postId ?? null, c.openingReportId ?? null, c.note ?? "", c.actorId ?? null, balance],
   );
   return balance;
+}
+
+/** Locks the user and checks today's earnings against the cap. Call inside a transaction before paying a reward. */
+async function underDailyCap(q: Q, userId: number): Promise<boolean> {
+  // Lock the author so two approvals on the same day can't both slip under the cap.
+  await q(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+  const [{ earned }] = await q<{ earned: number }>(
+    `SELECT COALESCE(sum(delta), 0)::int AS earned FROM point_ledger WHERE user_id = $1 AND ${CAPPED_KINDS} AND created_at >= ${startOfToday}`,
+    [userId],
+  );
+  const { dailyCap } = await getPointSettings();
+  return earned + POINTS_PER_POST <= dailyCap;
 }
 
 export type RewardResult = { awarded: number; capped: boolean };
@@ -73,19 +97,28 @@ export async function rewardPost(q: Q, postId: number): Promise<RewardResult> {
     [postId],
   );
   if (!post || post.reward || post.import_batch) return { awarded: 0, capped: false };
-  // Lock the author so two approvals on the same day can't both slip under the cap.
-  await q(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [post.user_id]);
-  const [{ earned }] = await q<{ earned: number }>(
-    `SELECT COALESCE(sum(delta), 0)::int AS earned FROM point_ledger WHERE user_id = $1 AND kind = 'post_reward' AND created_at >= ${startOfToday}`,
-    [post.user_id],
-  );
-  const { dailyCap } = await getPointSettings();
-  if (earned + POINTS_PER_POST > dailyCap) {
+  if (!(await underDailyCap(q, post.user_id))) {
     await q(`UPDATE posts SET reward = 'capped' WHERE id = $1`, [postId]);
     return { awarded: 0, capped: true };
   }
   await change(q, { userId: post.user_id, delta: POINTS_PER_POST, kind: "post_reward", postId, note: "经验分享通过审核" });
   await q(`UPDATE posts SET reward = 'awarded' WHERE id = $1`, [postId]);
+  return { awarded: POINTS_PER_POST, capped: false };
+}
+
+/** Rewards the reporter of an approved public 选考开放 report, once per report, within the same daily cap. */
+export async function rewardOpeningReport(q: Q, reportId: number): Promise<RewardResult> {
+  const [r] = await q<{ user_id: number; reward: string; company_name: string }>(
+    `SELECT user_id, reward, company_name FROM opening_reports WHERE id = $1 FOR UPDATE`,
+    [reportId],
+  );
+  if (!r || r.reward) return { awarded: 0, capped: false };
+  if (!(await underDailyCap(q, r.user_id))) {
+    await q(`UPDATE opening_reports SET reward = 'capped' WHERE id = $1`, [reportId]);
+    return { awarded: 0, capped: true };
+  }
+  await change(q, { userId: r.user_id, delta: POINTS_PER_POST, kind: "opening_reward", openingReportId: reportId, note: `选考信息：${r.company_name}`.slice(0, 200) });
+  await q(`UPDATE opening_reports SET reward = 'awarded' WHERE id = $1`, [reportId]);
   return { awarded: POINTS_PER_POST, capped: false };
 }
 
@@ -143,7 +176,7 @@ export async function pointSummary(userId: number) {
   const [user, today, pending, settings, history] = await Promise.all([
     queryOne<{ points: number; points_auto_ai: boolean }>(`SELECT points, points_auto_ai FROM users WHERE id = $1`, [userId]),
     queryOne<{ earned: number }>(
-      `SELECT COALESCE(sum(delta), 0)::int AS earned FROM point_ledger WHERE user_id = $1 AND kind = 'post_reward' AND created_at >= ${startOfToday}`,
+      `SELECT COALESCE(sum(delta), 0)::int AS earned FROM point_ledger WHERE user_id = $1 AND ${CAPPED_KINDS} AND created_at >= ${startOfToday}`,
       [userId],
     ),
     queryOne<{ n: number }>(`SELECT count(*)::int AS n FROM posts WHERE user_id = $1 AND status = 'pending'`, [userId]),

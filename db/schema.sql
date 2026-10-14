@@ -307,3 +307,58 @@ CREATE TABLE IF NOT EXISTS point_ledger (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS point_ledger_user_idx ON point_ledger(user_id, created_at DESC);
+
+-- ---------- v0.11: 本选考开放通知 ----------
+-- One public record per company (normalised name) and 届. Users follow a company and get an in-app notice when it opens.
+CREATE TABLE IF NOT EXISTS openings (
+  id              BIGSERIAL PRIMARY KEY,
+  company_name    TEXT NOT NULL,
+  company_key     TEXT NOT NULL,                        -- normalised name: no 株式会社 / spaces, NFKC, lower case
+  grad_year       INT,                                  -- 届; NULL = not limited to one 届
+  opens_at        TIMESTAMPTZ,                          -- エントリー受付開始
+  deadline        TIMESTAMPTZ,                          -- エントリー締切
+  url             TEXT NOT NULL DEFAULT '',             -- 采用页 / エントリー链接 (https only)
+  note            TEXT NOT NULL DEFAULT '',
+  source          TEXT NOT NULL DEFAULT 'admin',        -- admin | user
+  reporter_id     BIGINT REFERENCES users(id) ON DELETE SET NULL,  -- first user who reported it; shown only to admins
+  anonymous       BOOLEAN NOT NULL DEFAULT true,        -- false = the reporter chose to show their name
+  created_by      BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS openings_key_idx ON openings(company_key, COALESCE(grad_year, 0));
+
+-- Public reports from users wait here for an admin. Private ("仅自己可见") reports never come here: they go straight into the user's tracker.
+CREATE TABLE IF NOT EXISTS opening_reports (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  opening_id      BIGINT REFERENCES openings(id) ON DELETE SET NULL,  -- correction of an existing record, or the record it became
+  company_name    TEXT NOT NULL,
+  company_key     TEXT NOT NULL,
+  grad_year       INT,
+  opens_at        TIMESTAMPTZ,
+  deadline        TIMESTAMPTZ,
+  url             TEXT NOT NULL DEFAULT '',
+  note            TEXT NOT NULL DEFAULT '',
+  anonymous       BOOLEAN NOT NULL DEFAULT true,
+  status          TEXT NOT NULL DEFAULT 'pending',      -- pending | approved | rejected
+  review_note     TEXT NOT NULL DEFAULT '',
+  reviewer_id     BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at     TIMESTAMPTZ,
+  reward          TEXT NOT NULL DEFAULT '',             -- '' | awarded | capped
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS opening_reports_status_idx ON opening_reports(status, created_at);
+CREATE INDEX IF NOT EXISTS opening_reports_user_idx ON opening_reports(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS opening_follows (
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  company_key     TEXT NOT NULL,
+  company_name    TEXT NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, company_key)
+);
+CREATE INDEX IF NOT EXISTS opening_follows_key_idx ON opening_follows(company_key);
+
+-- point_ledger.kind may also be 'opening_reward' (a public report approved); it shares the daily cap with post_reward.
+ALTER TABLE point_ledger ADD COLUMN IF NOT EXISTS opening_report_id BIGINT REFERENCES opening_reports(id) ON DELETE SET NULL;
