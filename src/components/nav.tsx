@@ -35,12 +35,13 @@ export function SideNav({ name, provider, isAdmin, canWatch = false, counts }: {
     router.refresh();
   }
   return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-paper/70 px-4 py-6 backdrop-blur md:flex">
-      <Link href="/dashboard" className="flex items-center gap-2 px-2 font-bold">
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-paper/70 px-4 py-6 backdrop-blur md:flex [@media(max-height:820px)]:py-4">
+      <Link href="/dashboard" className="flex shrink-0 items-center gap-2 px-2 font-bold">
         <img src="/icon.svg" alt="" className="size-8" />
         就活小助手
       </Link>
-      <nav className="mt-8 space-y-1">
+      {/* The menu scrolls on its own when the window is short, so the account row below always stays visible. */}
+      <nav className="scrollbar-thin -mx-2 mt-8 min-h-0 flex-1 space-y-1 overflow-y-auto px-2 [@media(max-height:820px)]:mt-5 [@media(max-height:820px)]:space-y-0.5">
         {[
           ...items,
           { href: "/openings", label: "选考开放", icon: Megaphone },
@@ -57,22 +58,22 @@ export function SideNav({ name, provider, isAdmin, canWatch = false, counts }: {
               key={it.href}
               href={it.href === "/feedback" ? feedbackHref(path) : it.href}
               className={cx(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition [@media(max-height:820px)]:py-2",
                 active ? "bg-sakura-50 text-sakura-700" : "text-muted hover:bg-stone-50 hover:text-ink",
               )}
             >
-              <it.icon className="size-[18px]" />
+              <it.icon className="size-[18px] shrink-0" />
               {({ 选考: "选考追踪", 邮件: "邮件助手", 经验: "经验分享", 积分: "积分 · Point Market" } as Record<string, string>)[it.label] ?? it.label}
               <Dot n={it.badge ?? 0} />
             </Link>
           );
         })}
       </nav>
-      <div className="mt-auto space-y-3 px-2">
+      <div className="mt-3 shrink-0 space-y-3 border-t border-line px-2 pt-3">
         {provider && (
           <Link href="/admin/ai" className="block rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700 hover:bg-violet-100">
             <div className="font-medium">AI 引擎</div>
-            <div className="mt-0.5 truncate opacity-80">{provider}</div>
+            <div className="mt-0.5 truncate opacity-80 [@media(max-height:700px)]:hidden">{provider}</div>
           </Link>
         )}
         <div className="flex items-center justify-between text-sm">
