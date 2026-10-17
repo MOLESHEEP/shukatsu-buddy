@@ -51,6 +51,10 @@ export const DELETE = withUser(async (req, user) => {
     await query(`DELETE FROM opening_reports WHERE user_id = $1`, [user.id]);
     // Published 选考 records stay (others rely on them) but no longer point to this user.
     await query(`UPDATE openings SET reporter_id = NULL, anonymous = true WHERE reporter_id = $1`, [user.id]);
+    // 网页监控: personal pages / readings go; the admin pool belongs to the site and stays.
+    await query(`DELETE FROM watch_detections WHERE owner_id = $1 AND scope = 'personal'`, [user.id]);
+    await query(`DELETE FROM watch_pages WHERE owner_id = $1 AND scope = 'personal'`, [user.id]);
+    await query(`DELETE FROM official_tracks WHERE user_id = $1`, [user.id]);
   }
   return { ok: true };
 });

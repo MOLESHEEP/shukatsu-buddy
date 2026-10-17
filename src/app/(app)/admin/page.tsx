@@ -4,7 +4,7 @@ import { providerLabel } from "@/lib/llm/provider";
 import { PROVIDERS } from "@/lib/llm/providers";
 import { Card } from "@/components/ui";
 
-const TASK_LABELS: Record<string, string> = { es: "ES 添削", es_retry: "ES 字数压缩", email: "邮件识别", reply: "回信", post: "经验整理", review: "发布审核", test: "连接测试" };
+const TASK_LABELS: Record<string, string> = { es: "ES 添削", es_retry: "ES 字数压缩", email: "邮件识别", reply: "回信", post: "经验整理", review: "发布审核", test: "连接测试", watch: "网页监控识别" };
 
 export default async function AdminOverview() {
   const [o, label] = await Promise.all([overview(), providerLabel()]);

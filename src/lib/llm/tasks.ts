@@ -7,12 +7,14 @@ import {
   PostDraftSchema,
   PostReviewSchema,
   ReplySchema,
+  WatchExtractSchema,
   type EmailParse,
   type EsReview,
   type ImportExtract,
   type PostDraft,
   type PostReview,
   type ReplyDraft,
+  type WatchExtract,
 } from "./schemas";
 import { REPLY_SCENARIOS } from "../constants";
 import { todayLocal, APP_TZ } from "../time";
@@ -386,4 +388,53 @@ export async function reviewPost(post: {
     // Moderation is a site cost, not the author's AI use: no user id, so it never touches their daily limit.
     ctx: { userId: null, task: "review" },
   });
+}
+
+// ---------------- 网页监控：采用页识别 ----------------
+
+const WATCH_SYSTEM = `你负责阅读日本企业的新卒采用页面（采用サイト、マイページ公告、募集要項等），判断「本选考」的状况。
+注意区分：
+- 本選考 / 本エントリー 与 インターンシップ・仕事体験・オープン・カンパニー。只看本选考；页面只有实习信息时 is_selection_page=false，phase=unknown。
+- 第几次：「第1回締切」「第2クール」「1次募集 / 2次募集」「早期選考 / 本選考」等都算一次一次的选考批次。round_no 填当前正在受付或即将开始的那一次的序号，round_label 原样写页面上的叫法。
+- 对象届：「2028年卒」「28卒」→ 2028。
+- phase：受付中=open，已公布日期但还没开始=upcoming，全部截止=closed，看不出来=unknown。
+- items：页面上明确写出的日期（エントリー开始、ES / Webテスト截止、説明会、面接等）。日期一律输出 YYYY-MM-DDTHH:mm 日本时间；只写月日时根据今天推断年份（取最近的合理年份）；只有日期时开放类用 00:00、截止类用 23:59。
+- entry_url 只能填页面原文中出现过的完整 URL。
+- 绝不编造：没写的就留空或 null。evidence_ja 原样摘录页面上支撑判断的句子。拿不准的地方写进 uncertain_points_zh，confidence 相应降低。`;
+
+export async function extractWatch(input: { company: string; url: string; text: string }, userId: number | null): Promise<WatchExtract> {
+  const prompt = [
+    `今天是 ${todayLocal()}（时区 ${APP_TZ}）。`,
+    `【公司】${input.company || "未指定"}`,
+    input.url ? `【页面地址】${input.url}` : "",
+    `【页面正文（已去掉 HTML 标签，链接写成「文字 [链接 URL]」）】\n${input.text}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return generate({
+    system: WATCH_SYSTEM,
+    prompt,
+    schema: WatchExtractSchema,
+    effort: "low",
+    mock: () => mockWatch(input.company, input.text),
+    ctx: { userId, task: "watch" },
+  });
+}
+
+function mockWatch(company: string, text: string): WatchExtract {
+  const open = /本選考|エントリー受付中|受付を開始/.test(text);
+  return {
+    company_name: company || null,
+    is_selection_page: open,
+    phase: open ? "open" : "unknown",
+    grad_year: null,
+    round_no: /第\s*2\s*回/.test(text) ? 2 : null,
+    round_label: open ? "本選考（演示）" : "",
+    entry_url: null,
+    items: [],
+    summary_zh: "演示模式没有配置 AI，这是根据关键词给出的示例结果，请人工确认。",
+    evidence_ja: [],
+    confidence: 0.2,
+    uncertain_points_zh: ["演示模式：没有真正读取页面内容"],
+  };
 }

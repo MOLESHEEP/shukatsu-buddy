@@ -17,6 +17,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
           <option value="">全部用户</option>
           <option value="ai_off">未开通 AI</option>
           <option value="ai_on">已开通 AI</option>
+          <option value="watch">已开通网页监控</option>
           <option value="banned">已停用</option>
           <option value="admin">管理员</option>
         </Select>

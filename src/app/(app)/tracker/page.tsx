@@ -7,6 +7,8 @@ import { PageHeader, cx } from "@/components/ui";
 import { Kanban } from "./kanban";
 import { MonthCalendar } from "./calendar";
 import { AddCompany } from "./add-company";
+import { officialItemsFor } from "@/lib/watch";
+import { OfficialToggle } from "./official-toggle";
 
 export const metadata = { title: "选考追踪" };
 
@@ -21,8 +23,15 @@ export default async function TrackerPage({ searchParams }: { searchParams: Prom
     const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : todayLocal().slice(0, 7);
     const [y, m] = month.split("-").map(Number);
     const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-    const items = await calendarItems(user.id, localToIso(`${month}-01T00:00`)!, localToIso(`${next}-01T00:00`)!);
-    calendar = <MonthCalendar month={month} items={items} />;
+    const [from, to] = [localToIso(`${month}-01T00:00`)!, localToIso(`${next}-01T00:00`)!];
+    const [own, official] = await Promise.all([calendarItems(user.id, from, to), officialItemsFor(user.id, from, to)]);
+    const items = [...own, ...official].sort((a, b) => a.at.localeCompare(b.at));
+    calendar = (
+      <>
+        <OfficialToggle show={user.show_official} />
+        <MonthCalendar month={month} items={items} />
+      </>
+    );
   }
 
   const tabs = [

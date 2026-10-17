@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, Megaphone, MessageSquareHeart, PenLine, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
+import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, Megaphone, MessageSquareHeart, PenLine, Radar, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -26,7 +26,7 @@ function feedbackHref(path: string) {
   return path.startsWith("/feedback") ? "/feedback" : `/feedback?from=${encodeURIComponent(path)}`;
 }
 
-export function SideNav({ name, provider, isAdmin, counts }: { name: string; provider: string | null; isAdmin: boolean; counts: Counts }) {
+export function SideNav({ name, provider, isAdmin, canWatch = false, counts }: { name: string; provider: string | null; isAdmin: boolean; canWatch?: boolean; counts: Counts }) {
   const path = usePathname();
   const router = useRouter();
   async function logout() {
@@ -44,6 +44,7 @@ export function SideNav({ name, provider, isAdmin, counts }: { name: string; pro
         {[
           ...items,
           { href: "/openings", label: "选考开放", icon: Megaphone },
+          ...(canWatch ? [{ href: "/watch", label: "网页监控", icon: Radar }] : []),
           ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, badge: counts.pending }] : []),
           { href: "/points", label: "积分", icon: Coins },
           { href: "/notifications", label: "通知", icon: Bell, badge: counts.notices },

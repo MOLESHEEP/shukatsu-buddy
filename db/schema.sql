@@ -362,3 +362,89 @@ CREATE INDEX IF NOT EXISTS opening_follows_key_idx ON opening_follows(company_ke
 
 -- point_ledger.kind may also be 'opening_reward' (a public report approved); it shares the daily cap with post_reward.
 ALTER TABLE point_ledger ADD COLUMN IF NOT EXISTS opening_report_id BIGINT REFERENCES opening_reports(id) ON DELETE SET NULL;
+
+-- ---------- v0.12: 网页监控 + 官方选考日程 ----------
+-- Admins (and users an admin has opened it for) watch company 采用 pages; AI reads each changed page for
+-- whether 本选考 is open, which round it is, and the schedule. Admins confirm a detection and publish it as an
+-- official schedule, which shows on users' calendars marked 官方 — kept apart from the users' own tracker data.
+
+-- NULL / false = not opened for this user (admins always have it).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS watch_enabled BOOLEAN NOT NULL DEFAULT false;
+-- Show published official schedules on this user's calendar, dashboard and calendar feed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS show_official BOOLEAN NOT NULL DEFAULT true;
+
+CREATE TABLE IF NOT EXISTS watch_pages (
+  id              BIGSERIAL PRIMARY KEY,
+  owner_id        BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scope           TEXT NOT NULL DEFAULT 'admin',        -- admin: shared by all admins | personal: only the owner
+  company_name    TEXT NOT NULL,
+  url             TEXT NOT NULL,
+  grad_year       INT,                                  -- 届 the page is about, if known
+  interval_hours  INT NOT NULL DEFAULT 24,
+  active          BOOLEAN NOT NULL DEFAULT true,
+  content_hash    TEXT NOT NULL DEFAULT '',             -- hash of the extracted text at the last successful fetch
+  last_checked_at TIMESTAMPTZ,
+  last_status     TEXT NOT NULL DEFAULT '',             -- '' | unchanged | changed | error
+  last_error      TEXT NOT NULL DEFAULT '',
+  next_check_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS watch_pages_due_idx ON watch_pages(next_check_at) WHERE active;
+CREATE INDEX IF NOT EXISTS watch_pages_owner_idx ON watch_pages(owner_id);
+
+-- One row per AI reading of a page (only when the page text changed, or pasted by hand).
+CREATE TABLE IF NOT EXISTS watch_detections (
+  id              BIGSERIAL PRIMARY KEY,
+  page_id         BIGINT REFERENCES watch_pages(id) ON DELETE CASCADE,  -- NULL = pasted text, not a watched page
+  owner_id        BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scope           TEXT NOT NULL DEFAULT 'admin',
+  source          TEXT NOT NULL DEFAULT 'auto',         -- auto | manual | paste
+  source_url      TEXT NOT NULL DEFAULT '',
+  content_hash    TEXT NOT NULL DEFAULT '',
+  result          JSONB NOT NULL,                       -- WatchExtract from lib/llm/schemas.ts
+  status          TEXT NOT NULL DEFAULT 'new',          -- new | dismissed | published | tracked
+  schedule_id     BIGINT,                               -- official schedule it was published as
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS watch_detections_scope_idx ON watch_detections(scope, owner_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS official_schedules (
+  id              BIGSERIAL PRIMARY KEY,
+  company_name    TEXT NOT NULL,
+  company_key     TEXT NOT NULL,                        -- same normalisation as openings.company_key
+  grad_year       INT,
+  round_no        INT,                                  -- 第几次 (1, 2, 3 …); NULL = not stated
+  round_label     TEXT NOT NULL DEFAULT '',             -- as the company calls it: 第2回締切 / 二次募集 / 本選考
+  phase           TEXT NOT NULL DEFAULT 'open',         -- open | upcoming | closed
+  entry_url       TEXT NOT NULL DEFAULT '',
+  note            TEXT NOT NULL DEFAULT '',
+  calendar_scope  TEXT NOT NULL DEFAULT 'all',          -- all: every user's calendar | followers: users following the company
+  detection_id    BIGINT REFERENCES watch_detections(id) ON DELETE SET NULL,
+  published_by    BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  notified        INT NOT NULL DEFAULT 0,
+  withdrawn       BOOLEAN NOT NULL DEFAULT false,
+  published_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS official_schedules_key_idx ON official_schedules(company_key);
+
+CREATE TABLE IF NOT EXISTS official_schedule_items (
+  id              BIGSERIAL PRIMARY KEY,
+  schedule_id     BIGINT NOT NULL REFERENCES official_schedules(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL DEFAULT 'other',        -- entry_open | deadline | briefing | test | interview | other
+  title           TEXT NOT NULL,
+  starts_at       TIMESTAMPTZ NOT NULL,
+  location        TEXT NOT NULL DEFAULT '',
+  position        INT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS official_schedule_items_time_idx ON official_schedule_items(starts_at);
+CREATE INDEX IF NOT EXISTS official_schedule_items_schedule_idx ON official_schedule_items(schedule_id);
+
+-- A user copied an official schedule into their own tracker; the official copy then stays off their calendar (no duplicates).
+CREATE TABLE IF NOT EXISTS official_tracks (
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  schedule_id     BIGINT NOT NULL REFERENCES official_schedules(id) ON DELETE CASCADE,
+  company_id      BIGINT REFERENCES companies(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, schedule_id)
+);

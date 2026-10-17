@@ -21,10 +21,15 @@ export function UpcomingList({ items }: { items: UpcomingItem[] }) {
         const due = dueLabel(it.at);
         return (
           <li key={it.key}>
-            <Link href={`/tracker/${it.company_id}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-stone-50">
+            <Link href={it.href ?? `/tracker/${it.company_id}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-stone-50">
               <span className={cx("size-2.5 shrink-0 rounded-full", toneDot[kind.tone as Tone])} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">
+                  {it.official && (
+                    <Badge tone="violet" className="mr-1.5 px-1.5 py-0 align-[1px] text-[10px]">
+                      官方
+                    </Badge>
+                  )}
                   {it.company} · {it.title}
                 </div>
                 <div className="mt-0.5 truncate text-xs text-muted">

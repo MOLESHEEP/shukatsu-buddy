@@ -15,13 +15,18 @@ const Patch = z.object({
   limit_email: limit.optional(),
   limit_post: limit.optional(),
   reset_today: z.boolean().optional(),
+  /** 网页监控 for a non-admin user (admins always have it). */
+  watch_enabled: z.boolean().optional(),
   /** Super admins only: grant or revoke admin rights. */
   role: z.enum(["admin", "user"]).optional(),
 });
 
 export const PATCH = withAdmin<Ctx>(async (req, admin, { params }) => {
   const id = idParam((await params).id);
-  const target = await queryOne<{ role: string; status: string; email: string }>(`SELECT role, status, email FROM users WHERE id = $1`, [id]);
+  const target = await queryOne<{ role: string; status: string; email: string; watch_enabled: boolean }>(
+    `SELECT role, status, email, watch_enabled FROM users WHERE id = $1`,
+    [id],
+  );
   if (!target) throw new HttpError(404, "找不到这个用户");
   const b = await readJson(req, Patch);
   const email = target.email.toLowerCase();
@@ -60,6 +65,15 @@ export const PATCH = withAdmin<Ctx>(async (req, admin, { params }) => {
   if (b.limit_email !== undefined) set("limit_email", b.limit_email);
   if (b.limit_post !== undefined) set("limit_post", b.limit_post);
   if (b.reset_today) sets.push("quota_reset_at = now()");
+  if (b.watch_enabled !== undefined) set("watch_enabled", b.watch_enabled);
   if (sets.length) await query(`UPDATE users SET ${sets.join(", ")} WHERE id = $1`, vals);
+  if (b.watch_enabled !== undefined && b.watch_enabled !== target.watch_enabled && target.role !== "admin") {
+    await query(
+      `INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by) VALUES ($1, $2, $3, 'info', 'ids', ARRAY[$4::bigint], $5)`,
+      b.watch_enabled
+        ? ["已为你开通「网页监控」", "可以订阅公司的采用页面，AI 会识别本选考是否开放、第几次选考和日程，并加到你自己的选考追踪里。", "/watch", id, admin.id]
+        : ["你的「网页监控」已关闭", "已添加的页面会停止自动检查。如有疑问请联系管理员。", "", id, admin.id],
+    );
+  }
   return { ok: true };
 });
