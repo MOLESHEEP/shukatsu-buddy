@@ -7,6 +7,7 @@ import { unreadImportant } from "@/lib/notifications";
 import { ImportantNotices } from "@/components/important-notices";
 import { Card, EmptyState } from "@/components/ui";
 import { UpcomingList } from "@/components/upcoming-list";
+import { officialUpcoming } from "@/lib/watch";
 
 export const metadata = { title: "首页" };
 
@@ -24,7 +25,7 @@ function greeting() {
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const [items, s, ai, notices] = await Promise.all([upcoming(user.id, 0, 14), stats(user.id), aiAccess(user), unreadImportant(user.id)]);
+  const [items, s, ai, notices, official] = await Promise.all([upcoming(user.id, 0, 14), stats(user.id), aiAccess(user), unreadImportant(user.id), officialUpcoming(user.id, 0, 14)]);
   const urgent = items.filter((i) => new Date(i.at).getTime() - Date.now() < 3 * 86400000).length;
 
   return (
@@ -90,6 +91,12 @@ export default async function Dashboard() {
             </Link>
           </div>
           {items.length ? <UpcomingList items={items} /> : <EmptyState title="暂无日程">粘贴企业邮件，AI 会自动把面试和截止日加进来。</EmptyState>}
+          {official.length > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <h3 className="text-sm font-medium text-violet-700">官方选考日程 · 接下来两周</h3>
+              <UpcomingList items={official} />
+            </div>
+          )}
         </Card>
 
         <Card>

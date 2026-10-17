@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Check, ChevronDown, Coins, Copy, Crown, KeyRound, RotateCcw, ShieldCheck, ShieldMinus, ShieldPlus, Sparkles } from "lucide-react";
+import { Ban, Check, ChevronDown, Coins, Copy, Crown, KeyRound, Radar, RotateCcw, ShieldCheck, ShieldMinus, ShieldPlus, Sparkles } from "lucide-react";
 import { Badge, Button, EmptyState, Input, cx } from "@/components/ui";
 import { api, errMsg } from "@/lib/client";
 import type { AdminUserRow } from "@/lib/admin";
@@ -149,6 +149,11 @@ function UserRow({ u, isMe, defaults, viewerSuper }: { u: AdminUserRow; isMe: bo
           </div>
         )}
         <Badge tone={aiOn ? "mint" : "stone"}>{aiOn ? "可用 AI" : "无 AI"}</Badge>
+        {!admin && u.watch_enabled && (
+          <Badge tone="sky">
+            <Radar className="size-3" /> 网页监控
+          </Badge>
+        )}
         <Badge tone="lemon">
           <Coins className="size-3" /> {u.points}
         </Badge>
@@ -223,6 +228,17 @@ function UserRow({ u, isMe, defaults, viewerSuper }: { u: AdminUserRow; isMe: bo
             {(!admin || isMe || (viewerSuper && !u.env_admin)) && u.status === "active" && (
               <Button size="sm" variant="ghost" disabled={busy} onClick={makeResetLink} title="用户忘记密码时使用">
                 <KeyRound className="size-3.5" /> 重置密码链接
+              </Button>
+            )}
+            {!admin && u.status === "active" && (
+              <Button
+                size="sm"
+                variant={u.watch_enabled ? "danger" : "soft"}
+                disabled={busy}
+                onClick={() => patch({ watch_enabled: !u.watch_enabled })}
+                title="网页监控：订阅公司采用页，AI 识别本选考开放与日程（只加到本人的选考追踪，不能向他人发布）"
+              >
+                <Radar className="size-3.5" /> {u.watch_enabled ? "关闭网页监控" : "开通网页监控"}
               </Button>
             )}
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => patch({ reset_today: true })} title="清零今天已用次数">

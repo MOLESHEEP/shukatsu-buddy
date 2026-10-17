@@ -61,8 +61,16 @@ export function MonthCalendar({ month, items }: { month: string; items: Upcoming
                       {list.slice(0, 3).map((it) => {
                         const tone = (EVENT_KINDS[it.kind]?.tone ?? "stone") as Tone;
                         return (
-                          <Link key={it.key} href={`/tracker/${it.company_id}`} title={`${it.company} ${it.title}`} className="flex items-center gap-1 truncate rounded-md bg-paper px-1 py-0.5 text-[10px] leading-tight hover:bg-sakura-50 sm:text-[11px]">
-                            <span className={cx("size-1.5 shrink-0 rounded-full", toneDot[tone])} />
+                          <Link
+                            key={it.key}
+                            href={it.href ?? `/tracker/${it.company_id}`}
+                            title={`${it.official ? "【官方】" : ""}${it.company} ${it.title}`}
+                            className={cx(
+                              "flex items-center gap-1 truncate rounded-md px-1 py-0.5 text-[10px] leading-tight sm:text-[11px]",
+                              it.official ? "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100 hover:bg-violet-100" : "bg-paper hover:bg-sakura-50",
+                            )}
+                          >
+                            {it.official ? <span className="shrink-0 font-semibold">官</span> : <span className={cx("size-1.5 shrink-0 rounded-full", toneDot[tone])} />}
                             <span className="truncate">{it.company.replace(/株式会社|（株）|\(株\)/g, "").trim() || it.company}</span>
                           </Link>
                         );

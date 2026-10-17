@@ -69,6 +69,10 @@ export type User = {
   /** NULL = follow the site-wide default set by the admin. */
   ai_enabled: boolean | null;
   session_version: number;
+  /** 网页监控 opened for this (non-admin) user by an admin. */
+  watch_enabled: boolean;
+  /** Show published official schedules on this user's calendar. */
+  show_official: boolean;
   /** Derived from SUPER_ADMIN_EMAILS, never stored: can grant / revoke admin rights. */
   is_super: boolean;
 };
@@ -80,7 +84,7 @@ export async function getUser(): Promise<User | null> {
   const uid = session.uid;
   const user = await queryOne<User>(
     `SELECT id, email, display_name, grad_year, major, jp_level, plan, es_used, email_used, ics_token, career_stage,
-            role, status, ai_enabled, session_version
+            role, status, ai_enabled, session_version, watch_enabled, show_official
        FROM users WHERE id = $1`,
     [uid],
   );

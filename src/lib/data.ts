@@ -83,7 +83,20 @@ export async function findOrCreateCompany(userId: number, name: string) {
   return existing ? Number(existing.id) : createCompany(userId, { name });
 }
 
-export type UpcomingItem = { key: string; company_id: number; company: string; kind: string; title: string; at: string; location?: string; prep?: string };
+export type UpcomingItem = {
+  key: string;
+  company_id: number;
+  company: string;
+  kind: string;
+  title: string;
+  at: string;
+  location?: string;
+  prep?: string;
+  /** Published by an admin (官方选考日程), not the user's own event. */
+  official?: boolean;
+  /** Where the item links to; defaults to the company card. */
+  href?: string;
+};
 
 /** Everything with a date in the window: events, next-action deadlines, test deadlines. */
 export async function upcoming(userId: number, fromDays = 0, toDays = 30) {

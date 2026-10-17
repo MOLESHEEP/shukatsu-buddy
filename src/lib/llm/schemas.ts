@@ -108,3 +108,27 @@ export const ReplySchema = z.object({
   notes_zh: z.array(z.string()),
 });
 export type ReplyDraft = z.infer<typeof ReplySchema>;
+
+/** Reading of a company 采用 page: is 本选考 open, which round, and the dates. */
+export const WatchExtractSchema = z.object({
+  company_name: z.string().nullable(),
+  is_selection_page: z.boolean().describe("页面是否包含新卒本选考 / エントリー相关信息"),
+  phase: z.enum(["open", "upcoming", "closed", "unknown"]).describe("本选考エントリー：open=受付中 upcoming=已公布但未开始 closed=已截止"),
+  grad_year: z.number().int().nullable().describe("对象届，如 2028年卒 → 2028"),
+  round_no: z.number().int().nullable().describe("第几次选考 / 第几回締切，如 第2回 → 2；只有一次或没写时为 null"),
+  round_label: z.string().describe("页面原文里的叫法，如「本選考 第2回締切」「二次募集」；没有时为空字符串"),
+  entry_url: z.string().nullable().describe("エントリー / マイページ 链接（页面中出现的完整 URL）"),
+  items: z.array(
+    z.object({
+      kind: z.enum(["entry_open", "deadline", "briefing", "test", "interview", "other"]),
+      title_zh: z.string().describe("简短中文说明，如「ES 提交截止」"),
+      start_local: z.string().describe("YYYY-MM-DDTHH:mm，日本时间；只有日期时：开放类用 00:00，截止类用 23:59"),
+      location: z.string().nullable(),
+    }),
+  ),
+  summary_zh: z.string().describe("一两句中文总结"),
+  evidence_ja: z.array(z.string()).describe("支撑判断的页面原文片段（原样摘录，最多 5 条）"),
+  confidence: z.number().describe("0 到 1"),
+  uncertain_points_zh: z.array(z.string()),
+});
+export type WatchExtract = z.infer<typeof WatchExtractSchema>;

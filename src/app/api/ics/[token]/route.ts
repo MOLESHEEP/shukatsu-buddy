@@ -1,6 +1,7 @@
 import { queryOne } from "@/lib/db";
 import { upcoming } from "@/lib/data";
 import { EVENT_KINDS, TEST_TYPES } from "@/lib/constants";
+import { officialUpcoming } from "@/lib/watch";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,9 @@ export async function GET(_req: Request, { params }: Ctx) {
   const user = await queryOne<{ id: string }>(`SELECT id FROM users WHERE ics_token = $1`, [token.replace(/\.ics$/, "")]);
   if (!user) return new Response("Not found", { status: 404 });
 
-  const items = await upcoming(Number(user.id), -60, 365);
+  // Own items first; official schedules (if the user shows them) are marked 【官方】 so they stay distinguishable.
+  const [own, official] = await Promise.all([upcoming(Number(user.id), -60, 365), officialUpcoming(Number(user.id), -60, 365)]);
+  const items = [...own, ...official];
   const now = stamp(new Date().toISOString());
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//shukatsu-buddy//CN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:就活日程"];
   for (const it of items) {
@@ -32,7 +35,7 @@ export async function GET(_req: Request, { params }: Ctx) {
       `DTSTAMP:${now}`,
       `DTSTART:${start}`,
       `DTEND:${end}`,
-      `SUMMARY:${esc(`【${label}】${it.company} ${title}`)}`,
+      `SUMMARY:${esc(`${it.official ? "【官方】" : ""}【${label}】${it.company} ${title}`)}`,
       ...(it.location ? [`LOCATION:${esc(it.location)}`] : []),
       ...(it.prep ? [`DESCRIPTION:${esc("准备：" + it.prep)}`] : []),
     );

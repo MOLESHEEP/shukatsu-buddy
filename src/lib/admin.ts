@@ -53,6 +53,7 @@ export type AdminUserRow = {
   role: string;
   status: string;
   ai_enabled: boolean | null;
+  watch_enabled: boolean;
   plan: string;
   grad_year: number | null;
   career_stage: string;
@@ -85,9 +86,10 @@ export async function listUsers(q: string, filter: string) {
   if (filter === "ai_off") where.push(`(u.role <> 'admin' AND u.ai_enabled IS NOT TRUE)`);
   if (filter === "banned") where.push(`u.status = 'banned'`);
   if (filter === "admin") where.push(`u.role = 'admin'`);
+  if (filter === "watch") where.push(`u.role <> 'admin' AND u.watch_enabled`);
   const since = `GREATEST(${today}, COALESCE(u.quota_reset_at, '-infinity'))`;
   const rows = await query(
-    `SELECT u.id, u.email, u.display_name, u.role, u.status, u.ai_enabled, u.plan, u.grad_year, u.career_stage,
+    `SELECT u.id, u.email, u.display_name, u.role, u.status, u.ai_enabled, u.watch_enabled, u.plan, u.grad_year, u.career_stage,
             u.created_at, u.last_seen_at, u.limit_es, u.limit_email, u.limit_post,
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok AND a.task = 'es' AND a.created_at >= ${since})::int AS today_es,
             (SELECT count(*) FROM ai_usage a WHERE a.user_id = u.id AND a.ok AND a.task IN ('email', 'reply') AND a.created_at >= ${since})::int AS today_email,
