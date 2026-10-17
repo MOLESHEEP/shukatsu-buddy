@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, Megaphone, MessageSquareHeart, PenLine, Radar, Settings, ShieldCheck, SquareKanban, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, Megaphone, Menu, MessageSquareHeart, PenLine, Radar, Settings, ShieldCheck, SquareKanban, Users, X } from "lucide-react";
 import { cx } from "./ui";
 
 const items = [
@@ -108,36 +109,110 @@ export function BottomNav() {
   );
 }
 
-export function MobileTopBar({ isAdmin, counts }: { isAdmin: boolean; counts: Counts }) {
+/** Mobile header: notifications and a 「更多」 sheet with every page the 6-tab bottom bar can't hold. */
+export function MobileTopBar({ isAdmin, canWatch = false, name = "", counts }: { isAdmin: boolean; canWatch?: boolean; name?: string; counts: Counts }) {
   const path = usePathname();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  // Close on navigation and with Esc; keep the page behind from scrolling while the sheet is open.
+  useEffect(() => setOpen(false), [path]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
+
+  const more: { href: string; label: string; icon: typeof House; tone: string; badge?: number }[] = [
+    { href: "/openings", label: "选考开放", icon: Megaphone, tone: "text-sakura-600" },
+    ...(canWatch ? [{ href: "/watch", label: "网页监控", icon: Radar, tone: "text-sky-700" }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, tone: "text-violet-600", badge: counts.pending }] : []),
+    { href: "/points", label: "积分", icon: Coins, tone: "text-lemon-700" },
+    { href: feedbackHref(path), label: "意见反馈", icon: MessageSquareHeart, tone: "text-mint-700", badge: counts.replies },
+    { href: "/settings", label: "设置", icon: Settings, tone: "text-muted" },
+  ];
+  const moreDot = counts.pending + counts.replies > 0;
+  const moreActive = more.some((m) => path.startsWith(m.href.split("?")[0]));
+
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-cream/85 px-4 py-3 backdrop-blur md:hidden">
-      <Link href="/dashboard" className="flex items-center gap-2 font-bold">
-        <img src="/icon.svg" alt="" className="size-7" />
-        就活小助手
-      </Link>
-      <div className="flex">
-        {isAdmin && (
-          <Link href="/admin" className="relative rounded-full p-2 text-violet-600 hover:bg-paper" aria-label="管理后台">
-            <ShieldCheck className="size-5" />
-            {counts.pending > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
+    <>
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-cream/85 px-4 py-2.5 backdrop-blur md:hidden">
+        <Link href="/dashboard" className="flex min-w-0 items-center gap-2 font-bold">
+          <img src="/icon.svg" alt="" className="size-7 shrink-0" />
+          <span className="truncate">就活小助手</span>
+        </Link>
+        <div className="flex shrink-0 items-center">
+          <Link href="/notifications" className="relative rounded-full p-2.5 text-muted hover:bg-paper" aria-label="通知">
+            <Bell className="size-5" />
+            {counts.notices > 0 && <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-sakura-500" />}
           </Link>
-        )}
-        <Link href="/points" className="rounded-full p-2 text-lemon-700 hover:bg-paper" aria-label="积分">
-          <Coins className="size-5" />
-        </Link>
-        <Link href="/notifications" className="relative rounded-full p-2 text-muted hover:bg-paper" aria-label="通知">
-          <Bell className="size-5" />
-          {counts.notices > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
-        </Link>
-        <Link href={feedbackHref(path)} className="relative rounded-full p-2 text-muted hover:bg-paper" aria-label="意见反馈">
-          <MessageSquareHeart className="size-5" />
-          {counts.replies > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-sakura-500" />}
-        </Link>
-        <Link href="/settings" className="rounded-full p-2 text-muted hover:bg-paper" aria-label="设置">
-          <Settings className="size-5" />
-        </Link>
-      </div>
-    </header>
+          <button
+            onClick={() => setOpen(true)}
+            className={cx("relative rounded-full p-2.5 hover:bg-paper", moreActive ? "text-sakura-600" : "text-muted")}
+            aria-label="更多"
+            aria-expanded={open}
+          >
+            <Menu className="size-5" />
+            {moreDot && <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-sakura-500" />}
+          </button>
+        </div>
+      </header>
+
+      {open && (
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="更多">
+          <button className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" aria-label="关闭" onClick={() => setOpen(false)} />
+          <div className="animate-rise absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-paper px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[var(--shadow-lift)]">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-semibold">更多</p>
+              <button onClick={() => setOpen(false)} className="rounded-full p-2 text-muted hover:bg-stone-50" aria-label="关闭">
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {more.map((m) => {
+                const active = path.startsWith(m.href.split("?")[0]);
+                return (
+                  <Link
+                    key={m.label}
+                    href={m.href}
+                    className={cx(
+                      "relative flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-xs font-medium transition",
+                      active ? "bg-sakura-50 text-sakura-700" : "bg-cream/70 text-ink hover:bg-stone-50",
+                    )}
+                  >
+                    <m.icon className={cx("size-6", !active && m.tone)} />
+                    {m.label}
+                    {(m.badge ?? 0) > 0 && (
+                      <span className="absolute top-2 right-2 min-w-5 rounded-full bg-sakura-500 px-1.5 text-center text-[11px] leading-5 text-white tabular-nums">
+                        {m.badge! > 99 ? "99+" : m.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm">
+              <span className="min-w-0 truncate text-muted">{name}</span>
+              <button onClick={logout} className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-muted hover:bg-stone-50 hover:text-ink">
+                <LogOut className="size-4" /> 退出登录
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
