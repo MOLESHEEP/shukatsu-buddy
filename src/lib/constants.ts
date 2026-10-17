@@ -1,5 +1,8 @@
 // Shared, client-safe constants: selection flow, test types, ES templates.
 
+/** Cookie remembering whether the desktop sidebar is collapsed (read by the server so the first render matches). */
+export const NAV_COOKIE = "sb_nav";
+
 export const DEFAULT_STAGES = [
   "エントリー",
   "说明会",
