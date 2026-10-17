@@ -20,7 +20,7 @@ export type SentRow = {
   reach: number;
 };
 
-export function NotifyAdmin({ sent, activeUsers }: { sent: SentRow[]; activeUsers: number }) {
+export function NotifyAdmin({ sent, activeUsers, system }: { sent: SentRow[]; activeUsers: number; system?: { notices: number; deliveries: number } }) {
   const router = useRouter();
   const [f, setF] = useState({ title: "", body: "", link: "", level: "info" as "info" | "important", audience: "all" as "all" | "ids", ids: "" });
   const [busy, setBusy] = useState(false);
@@ -123,6 +123,11 @@ export function NotifyAdmin({ sent, activeUsers }: { sent: SentRow[]; activeUser
 
       <div className="space-y-2">
         <h2 className="font-semibold">已发送</h2>
+        {system && system.notices > 0 && (
+          <p className="text-xs text-muted">
+            另有最近 30 天系统自动发送的通知 {system.notices} 条（审核结果、选考开放 / 官方日程、权限变更等，个人通知共送达 {system.deliveries} 人次）。为保护隐私，这里不显示系统通知的收件人。
+          </p>
+        )}
         {sent.length === 0 ? (
           <EmptyState title="还没有发过通知" />
         ) : (

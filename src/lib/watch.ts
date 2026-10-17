@@ -161,7 +161,7 @@ async function saveDetection(
 async function notifyOwner(q: Q, ownerId: number, company: string, detectionId: number, r: WatchExtract) {
   const phase = WATCH_PHASES[r.phase]?.label ?? r.phase;
   const round = roundText(r);
-  await q(`INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by) VALUES ($1, $2, $3, 'important', 'ids', ARRAY[$4::bigint], NULL)`, [
+  await q(`INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by, system) VALUES ($1, $2, $3, 'important', 'ids', ARRAY[$4::bigint], NULL, true)`, [
     `网页监控：「${company}」本选考${phase}${round ? ` · ${round}` : ""}`,
     `${r.summary_zh}\n\nAI 识别结果（可信度 ${Math.round(r.confidence * 100)}%），请打开确认后再发布。`,
     `/watch?tab=detections#d-${detectionId}`,
@@ -422,7 +422,7 @@ async function notify(q: Q, scheduleId: number, s: { company_key: string; grad_y
   const link = `/official/${scheduleId}`;
   if (mode === "all") {
     // Site-wide notice: no recipient list is stored, so nothing about individual users is exposed.
-    await q(`INSERT INTO announcements (title, body, link, level, audience, created_by) VALUES ($1, $2, $3, 'important', 'all', $4)`, [text.title, text.body, link, actorId]);
+    await q(`INSERT INTO announcements (title, body, link, level, audience, created_by, system) VALUES ($1, $2, $3, 'important', 'all', $4, true)`, [text.title, text.body, link, actorId]);
     const [r] = await q<{ n: number }>(`SELECT count(*)::int AS n FROM users WHERE status = 'active'`);
     return r.n;
   }
@@ -431,8 +431,8 @@ async function notify(q: Q, scheduleId: number, s: { company_key: string; grad_y
        SELECT array_agg(f.user_id) AS ids FROM opening_follows f JOIN users u ON u.id = f.user_id
         WHERE f.company_key = $1 AND u.status = 'active' AND ($2::int IS NULL OR u.grad_year IS NULL OR u.grad_year = $2::int)
      ), ins AS (
-       INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by)
-       SELECT $3, $4, $5, 'important', 'ids', ids, $6 FROM target WHERE ids IS NOT NULL
+       INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by, system)
+       SELECT $3, $4, $5, 'important', 'ids', ids, $6, true FROM target WHERE ids IS NOT NULL
        RETURNING cardinality(user_ids) AS n
      )
      SELECT COALESCE((SELECT n FROM ins), 0)::int AS n`,

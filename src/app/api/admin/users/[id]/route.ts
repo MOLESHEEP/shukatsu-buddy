@@ -42,7 +42,7 @@ export const PATCH = withAdmin<Ctx>(async (req, admin, { params }) => {
       await q(`UPDATE users SET role = $2, role_granted_by = $3, role_granted_at = now() WHERE id = $1`, [id, b.role, admin.id]);
       // Let the person know: a direct notice only they can see.
       await q(
-        `INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by) VALUES ($1, $2, $3, 'important', 'ids', ARRAY[$4::bigint], $5)`,
+        `INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by, system) VALUES ($1, $2, $3, 'important', 'ids', ARRAY[$4::bigint], $5, true)`,
         b.role === "admin"
           ? ["你已被设为管理员", "侧边栏出现了「管理后台」，可以管理用户、内容和 AI 设置。请妥善使用权限。", "/admin", id, admin.id]
           : ["你的管理员权限已被取消", "你现在是普通用户。如有疑问请联系超级管理员。", "", id, admin.id],
@@ -69,7 +69,7 @@ export const PATCH = withAdmin<Ctx>(async (req, admin, { params }) => {
   if (sets.length) await query(`UPDATE users SET ${sets.join(", ")} WHERE id = $1`, vals);
   if (b.watch_enabled !== undefined && b.watch_enabled !== target.watch_enabled && target.role !== "admin") {
     await query(
-      `INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by) VALUES ($1, $2, $3, 'info', 'ids', ARRAY[$4::bigint], $5)`,
+      `INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by, system) VALUES ($1, $2, $3, 'info', 'ids', ARRAY[$4::bigint], $5, true)`,
       b.watch_enabled
         ? ["已为你开通「网页监控」", "可以订阅公司的采用页面，AI 会识别本选考是否开放、第几次选考和日程，并加到你自己的选考追踪里。", "/watch", id, admin.id]
         : ["你的「网页监控」已关闭", "已添加的页面会停止自动检查。如有疑问请联系管理员。", "", id, admin.id],
