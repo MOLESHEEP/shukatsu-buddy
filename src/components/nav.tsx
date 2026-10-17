@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, Megaphone, Menu, MessageSquareHeart, PenLine, Radar, Settings, ShieldCheck, SquareKanban, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, ClipboardCheck, Coins, House, LogOut, Mail, Megaphone, Menu, MessageSquareHeart, PanelLeftClose, PanelLeftOpen, PenLine, Radar, Settings, ShieldCheck, Sparkles, SquareKanban, Users, X } from "lucide-react";
 import { cx } from "./ui";
+import { NAV_COOKIE } from "@/lib/constants";
 
 const items = [
   { href: "/dashboard", label: "首页", icon: House },
@@ -27,59 +28,153 @@ function feedbackHref(path: string) {
   return path.startsWith("/feedback") ? "/feedback" : `/feedback?from=${encodeURIComponent(path)}`;
 }
 
-export function SideNav({ name, provider, isAdmin, canWatch = false, counts }: { name: string; provider: string | null; isAdmin: boolean; canWatch?: boolean; counts: Counts }) {
+/**
+ * Desktop sidebar. The menu scrolls on its own (with fades showing there is more), and the whole bar can be
+ * collapsed to icons; the choice is kept in a cookie so the server renders it the same way on the next visit.
+ */
+export function SideNav({
+  name,
+  provider,
+  isAdmin,
+  canWatch = false,
+  collapsed: initialCollapsed = false,
+  counts,
+}: {
+  name: string;
+  provider: string | null;
+  isAdmin: boolean;
+  canWatch?: boolean;
+  collapsed?: boolean;
+  counts: Counts;
+}) {
   const path = usePathname();
   const router = useRouter();
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  const navRef = useRef<HTMLElement>(null);
+  const [fade, setFade] = useState({ top: false, bottom: false });
+
+  // Fades at the top / bottom of the menu whenever there is more to scroll to.
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const update = () => setFade({ top: el.scrollTop > 2, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 2 });
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [collapsed]);
+
+  // Keep the current page's item in view.
+  useEffect(() => {
+    navRef.current?.querySelector<HTMLElement>("[aria-current=page]")?.scrollIntoView({ block: "nearest" });
+  }, [path]);
+
+  function toggle() {
+    const next = !collapsed;
+    setCollapsed(next);
+    document.cookie = `${NAV_COOKIE}=${next ? "collapsed" : "open"}; path=/; max-age=31536000; samesite=lax`;
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   }
+
+  const entries: { href: string; label: string; icon: typeof House; badge?: number }[] = [
+    ...items,
+    { href: "/openings", label: "选考开放", icon: Megaphone },
+    ...(canWatch ? [{ href: "/watch", label: "网页监控", icon: Radar }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, badge: counts.pending }] : []),
+    { href: "/points", label: "积分", icon: Coins },
+    { href: "/notifications", label: "通知", icon: Bell, badge: counts.notices },
+    { href: "/feedback", label: "意见反馈", icon: MessageSquareHeart, badge: counts.replies },
+    { href: "/settings", label: "设置", icon: Settings },
+  ];
+  const fullLabel = (l: string) => ({ 选考: "选考追踪", 邮件: "邮件助手", 经验: "经验分享", 积分: "积分 · Point Market" } as Record<string, string>)[l] ?? l;
+
   return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-paper/70 px-4 py-6 backdrop-blur md:flex [@media(max-height:820px)]:py-4">
-      <Link href="/dashboard" className="flex shrink-0 items-center gap-2 px-2 font-bold">
-        <img src="/icon.svg" alt="" className="size-8" />
-        就活小助手
-      </Link>
-      {/* The menu scrolls on its own when the window is short, so the account row below always stays visible. */}
-      <nav className="scrollbar-thin -mx-2 mt-8 min-h-0 flex-1 space-y-1 overflow-y-auto px-2 [@media(max-height:820px)]:mt-5 [@media(max-height:820px)]:space-y-0.5">
-        {[
-          ...items,
-          { href: "/openings", label: "选考开放", icon: Megaphone },
-          ...(canWatch ? [{ href: "/watch", label: "网页监控", icon: Radar }] : []),
-          ...(isAdmin ? [{ href: "/admin", label: "管理后台", icon: ShieldCheck, badge: counts.pending }] : []),
-          { href: "/points", label: "积分", icon: Coins },
-          { href: "/notifications", label: "通知", icon: Bell, badge: counts.notices },
-          { href: "/feedback", label: "意见反馈", icon: MessageSquareHeart, badge: counts.replies },
-          { href: "/settings", label: "设置", icon: Settings },
-        ].map((it: { href: string; label: string; icon: typeof House; badge?: number }) => {
-          const active = path.startsWith(it.href);
-          return (
-            <Link
-              key={it.href}
-              href={it.href === "/feedback" ? feedbackHref(path) : it.href}
-              className={cx(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition [@media(max-height:820px)]:py-2",
-                active ? "bg-sakura-50 text-sakura-700" : "text-muted hover:bg-stone-50 hover:text-ink",
-              )}
-            >
-              <it.icon className="size-[18px] shrink-0" />
-              {({ 选考: "选考追踪", 邮件: "邮件助手", 经验: "经验分享", 积分: "积分 · Point Market" } as Record<string, string>)[it.label] ?? it.label}
-              <Dot n={it.badge ?? 0} />
+    <aside
+      className={cx(
+        "sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-paper/70 py-6 backdrop-blur transition-[width] duration-200 md:flex",
+        "[@media(max-height:820px)]:py-4",
+        collapsed ? "w-[4.5rem] px-3" : "w-60 px-4",
+      )}
+    >
+      <div className={cx("flex shrink-0 items-center", collapsed ? "flex-col gap-2" : "justify-between gap-2")}>
+        <Link href="/dashboard" className={cx("flex min-w-0 items-center gap-2 font-bold", !collapsed && "px-2")} title="就活小助手">
+          <img src="/icon.svg" alt="" className="size-8 shrink-0" />
+          {!collapsed && <span className="truncate">就活小助手</span>}
+        </Link>
+        <button
+          onClick={toggle}
+          className="rounded-lg p-1.5 text-muted transition hover:bg-stone-50 hover:text-ink"
+          title={collapsed ? "展开侧边栏" : "收起侧边栏"}
+          aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? <PanelLeftOpen className="size-[18px]" /> : <PanelLeftClose className="size-[18px]" />}
+        </button>
+      </div>
+
+      <div className={cx("relative mt-6 min-h-0 flex-1", "[@media(max-height:820px)]:mt-4")}>
+        <nav ref={navRef} className={cx("scrollbar-thin -mx-2 h-full space-y-1 overflow-y-auto overscroll-contain px-2", "[@media(max-height:820px)]:space-y-0.5")}>
+          {entries.map((it) => {
+            const active = path.startsWith(it.href);
+            const label = fullLabel(it.label);
+            return (
+              <Link
+                key={it.href}
+                href={it.href === "/feedback" ? feedbackHref(path) : it.href}
+                aria-current={active ? "page" : undefined}
+                title={collapsed ? label : undefined}
+                className={cx(
+                  "relative flex items-center rounded-xl py-2.5 text-sm font-medium transition",
+                  "[@media(max-height:820px)]:py-2",
+                  collapsed ? "justify-center px-0" : "gap-3 px-3",
+                  active ? "bg-sakura-50 text-sakura-700" : "text-muted hover:bg-stone-50 hover:text-ink",
+                )}
+              >
+                <it.icon className="size-[18px] shrink-0" />
+                {collapsed ? (
+                  <>
+                    <span className="sr-only">{label}</span>
+                    {(it.badge ?? 0) > 0 && <span className="absolute top-1.5 right-2 size-2 rounded-full bg-sakura-500" />}
+                  </>
+                ) : (
+                  <>
+                    <span className="truncate">{label}</span>
+                    <Dot n={it.badge ?? 0} />
+                  </>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+        {/* Fades hint that the menu scrolls. */}
+        <div className={cx("pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-paper to-transparent transition-opacity", fade.top ? "opacity-100" : "opacity-0")} />
+        <div className={cx("pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-paper to-transparent transition-opacity", fade.bottom ? "opacity-100" : "opacity-0")} />
+      </div>
+
+      <div className={cx("mt-3 shrink-0 space-y-3 border-t border-line pt-3", !collapsed && "px-2")}>
+        {provider &&
+          (collapsed ? (
+            <Link href="/admin/ai" className="flex justify-center rounded-xl bg-violet-50 py-2 text-violet-700 hover:bg-violet-100" title={`AI 引擎：${provider}`}>
+              <Sparkles className="size-4" />
             </Link>
-          );
-        })}
-      </nav>
-      <div className="mt-3 shrink-0 space-y-3 border-t border-line px-2 pt-3">
-        {provider && (
-          <Link href="/admin/ai" className="block rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700 hover:bg-violet-100">
-            <div className="font-medium">AI 引擎</div>
-            <div className="mt-0.5 truncate opacity-80 [@media(max-height:700px)]:hidden">{provider}</div>
-          </Link>
-        )}
-        <div className="flex items-center justify-between text-sm">
-          <span className="truncate text-muted">{name}</span>
-          <button onClick={logout} className="rounded-lg p-1.5 text-muted hover:bg-stone-50 hover:text-ink" title="退出登录">
+          ) : (
+            <Link href="/admin/ai" className="block rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700 hover:bg-violet-100">
+              <div className="font-medium">AI 引擎</div>
+              <div className="mt-0.5 truncate opacity-80 [@media(max-height:700px)]:hidden">{provider}</div>
+            </Link>
+          ))}
+        <div className={cx("flex items-center text-sm", collapsed ? "justify-center" : "justify-between")}>
+          {!collapsed && <span className="truncate text-muted">{name}</span>}
+          <button onClick={logout} className="rounded-lg p-1.5 text-muted hover:bg-stone-50 hover:text-ink" title={collapsed ? `退出登录（${name}）` : "退出登录"}>
             <LogOut className="size-4" />
           </button>
         </div>
