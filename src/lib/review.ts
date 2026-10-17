@@ -28,7 +28,7 @@ function aiNote(r: PostReview) {
 }
 
 async function notify(q: Q, userId: number, title: string, body: string, link: string, actorId: number | null) {
-  await q(`INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by) VALUES ($1, $2, $3, 'info', 'ids', ARRAY[$4::bigint], $5)`, [
+  await q(`INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by, system) VALUES ($1, $2, $3, 'info', 'ids', ARRAY[$4::bigint], $5, true)`, [
     title,
     body,
     link,

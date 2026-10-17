@@ -448,3 +448,16 @@ CREATE TABLE IF NOT EXISTS official_tracks (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, schedule_id)
 );
+
+-- ---------- v0.12.1: 系统通知不向管理员暴露收件人 ----------
+-- Notices the app sends by itself (review results, 选考开放 / 官方日程 notices, permission changes …) are marked system.
+-- The admin notice page lists only notices an admin wrote by hand; system ones appear as counts, never with recipient ids,
+-- so admins can't infer who follows which company.
+ALTER TABLE announcements ADD COLUMN IF NOT EXISTS system BOOLEAN NOT NULL DEFAULT false;
+-- Backfill notices sent before the flag existed (their titles are fixed by the code that sends them).
+UPDATE announcements SET system = true
+ WHERE NOT system AND audience = 'ids'
+   AND (title LIKE '你的分享已通过审核%' OR title = '你的分享未通过审核'
+     OR title IN ('你已被设为管理员', '你的管理员权限已被取消', '已为你开通「网页监控」', '你的「网页监控」已关闭', '你上报的选考信息未通过审核')
+     OR title LIKE '你上报的选考信息已通过审核%'
+     OR title LIKE '「%」%本选考%' OR title LIKE '网页监控：%' OR title LIKE '【官方】%');

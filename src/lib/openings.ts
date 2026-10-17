@@ -338,8 +338,8 @@ async function notifyFollowers(q: Q, u: Upserted, actorId: number, excludeIds: n
           AND ($2::int IS NULL OR u.grad_year IS NULL OR u.grad_year = $2::int)
           AND NOT (f.user_id = ANY($3::bigint[]))
      ), ins AS (
-       INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by)
-       SELECT $4, $5, $6, 'important', 'ids', ids, $7 FROM target WHERE ids IS NOT NULL
+       INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by, system)
+       SELECT $4, $5, $6, 'important', 'ids', ids, $7, true FROM target WHERE ids IS NOT NULL
        RETURNING cardinality(user_ids) AS n
      )
      SELECT COALESCE((SELECT n FROM ins), 0)::int AS n`,
@@ -349,7 +349,7 @@ async function notifyFollowers(q: Q, u: Upserted, actorId: number, excludeIds: n
 }
 
 async function notifyUser(q: Q, userId: number, title: string, body: string, link: string, actorId: number) {
-  await q(`INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by) VALUES ($1, $2, $3, 'info', 'ids', ARRAY[$4::bigint], $5)`, [
+  await q(`INSERT INTO announcements (title, body, link, level, audience, user_ids, created_by, system) VALUES ($1, $2, $3, 'info', 'ids', ARRAY[$4::bigint], $5, true)`, [
     title,
     body,
     link,
