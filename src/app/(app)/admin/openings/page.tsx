@@ -50,8 +50,8 @@ export default async function AdminOpenings({ searchParams }: { searchParams: Pr
         ))}
       </div>
     ) : (
-      <EmptyState title={view === "pending" ? "没有待审核的上报 🎉" : "这里还没有记录"}>
-        {view === "pending" ? "用户选择「公开」上报的选考开放信息会在这里等你审核。「仅自己可见」的上报不会出现在这里。" : null}
+      <EmptyState title={view === "pending" ? "没有待审核的分享 🎉" : "这里还没有记录"}>
+        {view === "pending" ? "用户选择「公开」分享的选考开放信息会在这里等你审核。「仅自己可见」的分享不会出现在这里。" : null}
       </EmptyState>
     );
   }
@@ -59,7 +59,7 @@ export default async function AdminOpenings({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        本选考开放信息：管理员直接录入，或审核用户的公开上报。发布或日期 / 链接变化时，关注这家公司（且届数匹配）的用户会收到站内「重要」通知。
+        本选考开放信息：管理员直接录入，或审核用户的公开分享。发布或日期 / 链接变化时，关注这家公司（且届数匹配）的用户会收到站内「重要」通知。
       </p>
       <div className="scrollbar-thin flex gap-1 overflow-x-auto">
         {tabs.map((t) => (

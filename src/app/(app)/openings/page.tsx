@@ -28,7 +28,7 @@ export default async function OpeningsPage({ searchParams }: { searchParams: Pro
   const tabs = [
     { key: "all", label: "全部" },
     { key: "following", label: `⭐ 我关注的${follows.length ? ` (${follows.length})` : ""}` },
-    { key: "mine", label: "我的上报" },
+    { key: "mine", label: "我分享的" },
   ];
 
   return (
@@ -42,7 +42,7 @@ export default async function OpeningsPage({ searchParams }: { searchParams: Pro
             href="/openings/new"
             className="inline-flex items-center gap-1.5 rounded-full bg-sakura-500 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-lift)] transition hover:bg-sakura-600"
           >
-            <Megaphone className="size-4" /> 上报开放信息
+            <Megaphone className="size-4" /> 分享开放信息
           </Link>
         }
       />
@@ -97,7 +97,7 @@ export default async function OpeningsPage({ searchParams }: { searchParams: Pro
           title={tab === "following" ? "你关注的公司还没有开放信息" : sp.q ? "没有找到这家公司的记录" : "还没有开放信息"}
           action={
             <Link href={`/openings/new${sp.q ? `?company=${encodeURIComponent(sp.q)}` : ""}`} className="text-sm font-medium text-sakura-600 hover:underline">
-              知道哪家开放了？上报一下 →
+              知道哪家开放了？分享一下 →
             </Link>
           }
         >

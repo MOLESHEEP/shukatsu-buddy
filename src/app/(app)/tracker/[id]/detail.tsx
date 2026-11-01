@@ -146,10 +146,10 @@ function OpeningsCard({ name, info }: { name: string; info: Props["openings"] })
           })}
         </ul>
       ) : (
-        <p className="mt-2 text-sm text-muted">{info.following ? "还没有开放信息，开放时会通知你。" : "还没有开放信息。关注后，有人上报或管理员发布时会通知你。"}</p>
+        <p className="mt-2 text-sm text-muted">{info.following ? "还没有开放信息，开放时会通知你。" : "还没有开放信息。关注后，有人分享或管理员发布时会通知你。"}</p>
       )}
       <Link href={`/openings/new?company=${encodeURIComponent(name)}`} className="mt-3 inline-block text-sm font-medium text-sakura-600 hover:underline">
-        ＋ 上报开放信息
+        ＋ 分享开放信息
       </Link>
     </Card>
   );

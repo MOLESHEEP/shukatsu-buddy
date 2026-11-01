@@ -78,7 +78,7 @@ export function ReportForm({ target, defaultCompany, defaultGradYear }: { target
             </Link>
           )}
           <Link href={done.visibility === "public" ? "/openings?tab=mine" : "/openings"} className="font-medium text-sakura-600 hover:underline">
-            {done.visibility === "public" ? "我的上报" : "返回选考开放"}
+            {done.visibility === "public" ? "查看我分享的" : "返回选考开放"}
           </Link>
         </div>
       </Card>
@@ -140,7 +140,7 @@ export function ReportForm({ target, defaultCompany, defaultGradYear }: { target
             <label className="flex items-start gap-2">
               <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} className="mt-0.5 accent-sakura-500" />
               <span>
-                匿名上报<span className="text-muted">（推荐。只有管理员能看到是谁上报的；取消勾选会显示你的昵称）</span>
+                匿名分享<span className="text-muted">（推荐。只有管理员能看到是谁分享的；取消勾选会显示你的昵称）</span>
               </span>
             </label>
             <label className="flex items-start gap-2">

@@ -92,7 +92,7 @@ export function OpeningCard({ o, focused = false }: { o: Opening; focused?: bool
         </Link>
       </div>
       <p className="text-xs text-muted">
-        {o.source === "admin" ? "管理员整理" : o.reporter_name ? `${o.reporter_name} 上报` : "同学匿名上报"} · 更新于 {new Date(o.updated_at).toLocaleDateString("zh-CN")} · 以公司官方信息为准
+        {o.source === "admin" ? "管理员整理" : o.reporter_name ? `${o.reporter_name} 分享` : "同学匿名分享"} · 更新于 {new Date(o.updated_at).toLocaleDateString("zh-CN")} · 以公司官方信息为准
       </p>
     </Card>
   );
@@ -187,7 +187,7 @@ export function MyReports({ reports }: { reports: MyReport[] }) {
   const [busy, setBusy] = useState<number | null>(null);
 
   async function withdraw(id: number) {
-    if (!confirm("撤回这条上报？")) return;
+    if (!confirm("撤回这条分享？")) return;
     setBusy(id);
     try {
       await api(`/api/openings/reports/${id}`, { method: "DELETE" });
@@ -202,14 +202,14 @@ export function MyReports({ reports }: { reports: MyReport[] }) {
   if (!reports.length) {
     return (
       <EmptyState
-        title="你还没有公开上报过"
+        title="你还没有公开分享过"
         action={
           <Link href="/openings/new" className="text-sm font-medium text-sakura-600 hover:underline">
-            上报开放信息 →
+            分享开放信息 →
           </Link>
         }
       >
-        公开上报通过审核后会通知关注这家公司的同学，并获得 1 point。「仅自己可见」的上报直接写进你的选考追踪，不会出现在这里。
+        公开分享通过审核后会通知关注这家公司的同学，并获得 1 point。「仅自己可见」的分享直接写进你的选考追踪，不会出现在这里。
       </EmptyState>
     );
   }
