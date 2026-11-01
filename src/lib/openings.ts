@@ -252,9 +252,9 @@ export async function submitReport(user: User, input: z.infer<typeof OpeningRepo
     if (!target) throw new HttpError(404, "要纠错的记录已经不存在了，请刷新");
   }
   const dup = await queryOne(`SELECT 1 FROM opening_reports WHERE user_id = $1 AND company_key = $2 AND status = 'pending'`, [user.id, v.company_key]);
-  if (dup) throw new HttpError(409, "你上报的这家公司还在审核中，审核完成后再提交新的信息吧");
+  if (dup) throw new HttpError(409, "你分享的这家公司信息还在审核中，审核完成后再提交新的信息吧");
   if ((await hits("opening_report", String(user.id), 24 * 60)) >= REPORTS_PER_DAY) {
-    throw new HttpError(429, `每天最多公开上报 ${REPORTS_PER_DAY} 条，明天再来吧`);
+    throw new HttpError(429, `每天最多公开分享 ${REPORTS_PER_DAY} 条，明天再来吧`);
   }
   await hit("opening_report", String(user.id));
 
@@ -271,7 +271,7 @@ export async function submitReport(user: User, input: z.infer<typeof OpeningRepo
 /** The reporter may withdraw a report that is still pending. */
 export async function withdrawReport(userId: number, reportId: number) {
   const rows = await query(`DELETE FROM opening_reports WHERE id = $1 AND user_id = $2 AND status = 'pending' RETURNING id`, [reportId, userId]);
-  if (!rows.length) throw new HttpError(409, "这条上报已经审核过了，不能撤回");
+  if (!rows.length) throw new HttpError(409, "这条分享已经审核过了，不能撤回");
 }
 
 // ---------- writes shared by admin entry and approvals ----------
@@ -442,7 +442,7 @@ export async function pendingReportCount() {
 export async function approveReport(admin: User, reportId: number, fields?: OpeningFieldsValue): Promise<AdminResult & { reward: RewardResult }> {
   return transaction(async (q) => {
     const [r] = await q(`SELECT * FROM opening_reports WHERE id = $1 AND status = 'pending' FOR UPDATE`, [reportId]);
-    if (!r) throw new HttpError(409, "这条上报的状态已经变了（可能已被处理或撤回），请刷新");
+    if (!r) throw new HttpError(409, "这条分享的状态已经变了（可能已被处理或撤回），请刷新");
     const v: Values = fields
       ? toValues(fields)
       : {
@@ -465,7 +465,7 @@ export async function approveReport(admin: User, reportId: number, fields?: Open
     await notifyUser(
       q,
       Number(r.user_id),
-      `你上报的选考信息已通过审核${reward.awarded ? ` · +${reward.awarded} point` : ""}`,
+      `你分享的选考信息已通过审核${reward.awarded ? ` · +${reward.awarded} point` : ""}`,
       `「${v.company_name}」的本选考信息已公开${notified ? `，已通知 ${notified} 位关注这家公司的同学` : ""}${pts}。谢谢分享！`,
       `/openings?focus=${u.id}#o-${u.id}`,
       admin.id,
@@ -481,7 +481,7 @@ export async function rejectReport(admin: User, reportId: number, note: string) 
         WHERE id = $1 AND status = 'pending' RETURNING user_id, company_name`,
       [reportId, note, admin.id],
     );
-    if (!r) throw new HttpError(409, "这条上报的状态已经变了（可能已被处理或撤回），请刷新");
-    await notifyUser(q, Number(r.user_id), "你上报的选考信息未通过审核", `「${r.company_name}」：${note || "信息无法确认"}。可以补充官方链接后重新上报。`, "/openings?tab=mine", admin.id);
+    if (!r) throw new HttpError(409, "这条分享的状态已经变了（可能已被处理或撤回），请刷新");
+    await notifyUser(q, Number(r.user_id), "你分享的选考信息未通过审核", `「${r.company_name}」：${note || "信息无法确认"}。可以补充官方链接后重新分享。`, "/openings?tab=mine", admin.id);
   });
 }

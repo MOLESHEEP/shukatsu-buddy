@@ -164,7 +164,7 @@ export function PublishedOpening({ o }: { o: Opening }) {
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge tone={phase.tone}>{phase.label}</Badge>
-            <Badge tone={o.source === "admin" ? "violet" : "sky"}>{o.source === "admin" ? "管理员录入" : "用户上报"}</Badge>
+            <Badge tone={o.source === "admin" ? "violet" : "sky"}>{o.source === "admin" ? "管理员录入" : "用户分享"}</Badge>
             <span className="font-medium">{o.company_name}</span>
           </div>
           <Summary o={o} />
@@ -193,7 +193,7 @@ export function ReportReview({ r }: { r: ReportRow }) {
   const [error, setError] = useState<string | null>(null);
 
   async function act(action: "approve" | "reject") {
-    if (action === "reject" && !note.trim() && !confirm("没有填写驳回原因，上报人只会看到「信息无法确认」。继续？")) return;
+    if (action === "reject" && !note.trim() && !confirm("没有填写驳回原因，分享者只会看到「信息无法确认」。继续？")) return;
     setBusy(true);
     setError(null);
     try {
@@ -219,7 +219,7 @@ export function ReportReview({ r }: { r: ReportRow }) {
         <ChevronDown className={cx("size-4 shrink-0 transition", open && "rotate-180")} />
       </button>
       <p className="text-xs text-muted">
-        上报人 {r.reporter_email}（ID {r.reporter_id}）· {new Date(r.created_at).toLocaleString("zh-CN")}
+        分享者 {r.reporter_email}（ID {r.reporter_id}）· {new Date(r.created_at).toLocaleString("zh-CN")}
         {r.reviewer_email && ` · 审核：${r.reviewer_email}`}
       </p>
       {r.review_note && <p className="mt-2 rounded-xl bg-stone-50 px-3 py-2 text-xs">{r.review_note}</p>}
@@ -234,9 +234,9 @@ export function ReportReview({ r }: { r: ReportRow }) {
           )}
           {r.status === "pending" ? (
             <>
-              <p className="text-xs text-muted">下面是用户上报的内容，可以先修正再通过。通过后{r.existing ? "会覆盖上面的记录" : "会新建一条记录"}，日期或链接有变化时通知关注的用户。</p>
+              <p className="text-xs text-muted">下面是用户分享的内容，可以先修正再通过。通过后{r.existing ? "会覆盖上面的记录" : "会新建一条记录"}，日期或链接有变化时通知关注的用户。</p>
               <Fields f={f} set={set} />
-              <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="驳回原因（会通知上报人）" />
+              <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="驳回原因（会通知分享者）" />
               <ErrorNote message={error} />
               <div className="flex flex-wrap justify-end gap-2">
                 <Button size="sm" variant="danger" disabled={busy} onClick={() => act("reject")}>

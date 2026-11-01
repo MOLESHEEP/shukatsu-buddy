@@ -58,7 +58,7 @@ type Change = {
   actorId?: number | null;
 };
 
-/** Kinds that count toward the daily earning cap (shared by 经验分享 and 选考信息上报). */
+/** Kinds that count toward the daily earning cap (shared by 经验分享 and 选考信息分享). */
 const CAPPED_KINDS = `kind IN ('post_reward', 'opening_reward')`;
 
 /** Applies one change inside a transaction. A balance can never go below zero. */
